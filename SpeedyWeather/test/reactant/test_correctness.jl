@@ -1,6 +1,6 @@
 # Helper functions (`sync_variables!` is in setup.jl)
 
-"""Look up the (rtol, atol) tolerance pair for a variable from a namedtuple of
+"""Look up the (norm-relative) tolerance `rtol` for a variable from a namedtuple of
 tolerances. Variables not explicitly listed fall back to `tolerances.default`.
 A trailing `_prev` (used for Leapfrog copies) is stripped before lookup so
 e.g. `temperature_prev` shares the tolerance of `temperature`."""
@@ -16,8 +16,10 @@ end
 """Compare all array entries in two NamedTuples, skipping non-array entries
 and keys not present in both. Returns a Dict mapping variable names to
 comparison statistics. Tolerances are looked up per-variable from
-`tolerances`; unknown variables get `tolerances.default`."""
-function compare_arrays(nt_cpu::NamedTuple, nt_reactant::NamedTuple; tolerances::NamedTuple = TOLERANCES)
+`tolerances`; unknown variables get `tolerances.default`. Arrays are compared
+with `isapprox` without `atol`, i.e. `norm(cpu - reactant) <= rtol * max(norm(cpu), norm(reactant))`,
+the norm-relative difference is the left-hand side divided by `max(norm(cpu), norm(reactant))`."""
+function compare_arrays(nt_cpu::NamedTuple, nt_reactant::NamedTuple; tolerances::NamedTuple)
     results = Dict{Symbol, NamedTuple}()
 
     for key in keys(nt_cpu)
@@ -28,19 +30,35 @@ function compare_arrays(nt_cpu::NamedTuple, nt_reactant::NamedTuple; tolerances:
         arr_reactant = Array(getfield(nt_reactant, key))
         abs_diff = abs.(arr_cpu .- arr_reactant)
         rel_diff = abs_diff ./ max.(abs.(arr_cpu), abs.(arr_reactant), eps(eltype(real(arr_cpu))))
-        tol = tolerance_for(key, tolerances)
+        max_norm = max(norm(arr_cpu), norm(arr_reactant))
+        rtol = tolerance_for(key, tolerances)
         results[key] = (
+            norm_rel_diff = iszero(max_norm) ? zero(max_norm) : norm(abs_diff) / max_norm,
             max_abs_diff = maximum(abs_diff),
             mean_abs_diff = mean(abs_diff),
             max_rel_diff = maximum(rel_diff),
             mean_rel_diff = mean(rel_diff),
-            rtol = tol.rtol,
-            atol = tol.atol,
-            matches = isapprox(arr_cpu, arr_reactant, rtol = tol.rtol, atol = tol.atol),
+            rtol,
+            matches = isapprox(arr_cpu, arr_reactant; rtol),
         )
     end
 
     return results
+end
+
+"""Print the statistics of [`compare_arrays`](@ref) for every variable."""
+function print_comparison(title, results)
+    println("\n", title)
+    for (name, r) in results
+        println("  $name:")
+        println("    Norm-relative difference: $(r.norm_rel_diff)")
+        println("    Max absolute difference:  $(r.max_abs_diff)")
+        println("    Mean absolute difference: $(r.mean_abs_diff)")
+        println("    Max relative difference:  $(r.max_rel_diff)")
+        println("    Mean relative difference: $(r.mean_rel_diff)")
+        println("    Tolerance (rtol):         $(r.rtol)")
+    end
+    return nothing
 end
 
 """Compare that the clock is running in the same way."""
@@ -63,7 +81,7 @@ numerical paths through @jit), the resulting grid variables — and therefore
 the tendencies — can differ at the level of the spectral transform
 discrepancy. We therefore compare tendencies after running both models in
 the same self-consistent way, mirroring `test_time_stepping!`."""
-function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = 1, tolerances::NamedTuple = TOLERANCES)
+function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = 1, tolerances::NamedTuple)
     println("\n" * "-"^60)
     println("Testing tendencies ($nsteps steps)")
     println("-"^60)
@@ -101,15 +119,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothi
     vars_reactant, _ = SpeedyWeather.unpack(sim_reactant)
     tend_results = compare_arrays(vars_cpu.tendencies, vars_reactant.tendencies; tolerances)
 
-    println("\nTendency comparison:")
-    for (name, r) in tend_results
-        println("  $name:")
-        println("    Max absolute difference:  $(r.max_abs_diff)")
-        println("    Mean absolute difference: $(r.mean_abs_diff)")
-        println("    Max relative difference:  $(r.max_rel_diff)")
-        println("    Mean relative difference: $(r.mean_rel_diff)")
-        println("    Tolerance (rtol, atol):   ($(r.rtol), $(r.atol))")
-    end
+    print_comparison("Tendency comparison:", tend_results)
 
     @testset "$model_name Tendency Comparison" begin
         for (name, r) in tend_results
@@ -121,7 +131,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothi
 end
 
 """Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
-function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = NSTEPS, tolerances::NamedTuple = TOLERANCES)
+function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = nothing; nsteps = NSTEPS, tolerances::NamedTuple)
     println("\n" * "-"^60)
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
@@ -151,25 +161,9 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     progn_results = compare_arrays(vars_cpu.prognostic, vars_reactant.prognostic; tolerances)
     grid_results = compare_arrays(vars_cpu.grid, vars_reactant.grid; tolerances)
 
-    println("\nPrognostic variable comparison after $nsteps steps:")
-    for (name, r) in progn_results
-        println("  $name:")
-        println("    Max absolute difference:  $(r.max_abs_diff)")
-        println("    Mean absolute difference: $(r.mean_abs_diff)")
-        println("    Max relative difference:  $(r.max_rel_diff)")
-        println("    Mean relative difference: $(r.mean_rel_diff)")
-        println("    Tolerance (rtol, atol):   ($(r.rtol), $(r.atol))")
-    end
+    print_comparison("Prognostic variable comparison after $nsteps steps:", progn_results)
 
-    println("\nGrid variable comparison after $nsteps steps:")
-    for (name, r) in grid_results
-        println("  $name:")
-        println("    Max absolute difference:  $(r.max_abs_diff)")
-        println("    Mean absolute difference: $(r.mean_abs_diff)")
-        println("    Max relative difference:  $(r.max_rel_diff)")
-        println("    Mean relative difference: $(r.mean_rel_diff)")
-        println("    Tolerance (rtol, atol):   ($(r.rtol), $(r.atol))")
-    end
+    print_comparison("Grid variable comparison after $nsteps steps:", grid_results)
 
     @testset "$model_name Time Stepping" begin
         @testset "Clock" begin
@@ -192,10 +186,12 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     return (progn_results, grid_results)
 end
 
-"""Run all correctness tests for a given model type, both models with a spectral transform of type `Transform`."""
+"""Run all correctness tests for a given model type, both models with a spectral transform of type `Transform`.
+`tolerances` (see `correctness_tolerances` in runtests.jl) holds the tolerances of the `tendencies` and of
+the `time_stepping`."""
 function test_model(
         ModelType::Type; Transform = MatrixSpectralTransform, truncation = TRUNCATION, nsteps = NSTEPS,
-        tolerances::NamedTuple = TOLERANCES, precompile = false
+        tolerances::NamedTuple = correctness_tolerances(ModelType), precompile = false
     )
     model_name = "$ModelType with $(nameof(Transform))"
 
@@ -233,8 +229,10 @@ function test_model(
     end
 
     @testset "$model_name CPU vs Reactant" begin
-        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_timestep!; tolerances)
-        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name, r_timestep!; nsteps, tolerances)
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_timestep!; tolerances = tolerances.tendencies)
+        stepping_results = test_time_stepping!(
+            simulation_cpu, simulation_reactant, model_name, r_timestep!; nsteps, tolerances = tolerances.time_stepping
+        )
 
         # the default precipitation diagnostics (see `PrecipitationDiagnostics`) run inside `time_step!`
         if ModelType <: PrimitiveWetModel
