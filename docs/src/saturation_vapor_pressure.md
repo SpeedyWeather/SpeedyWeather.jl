@@ -45,9 +45,9 @@ subtypes(SpeedyWeather.AbstractSaturationVaporPressure)
 
 | Formulation | Formula | Phases | Notes |
 |---|---|---|---|
-| `ClausiusClapeyronConstantL` (default) | ``e_0 \exp\left(\frac{L_v}{R_v}\left(\frac{1}{T_0} - \frac{1}{T}\right)\right)`` | liquid | ``L_v, R_v`` from the atmosphere; +2–4% at 30–40˚C |
+| `ClausiusClapeyronConstantL` | ``e_0 \exp\left(\frac{L_v}{R_v}\left(\frac{1}{T_0} - \frac{1}{T}\right)\right)`` | liquid | ``L_v, R_v`` from the atmosphere; +2–4% at 30–40˚C |
 | `ClausiusClapeyronLinearL` | ``e_0 \left(\frac{T}{T_0}\right)^a \exp\left(b\left(\frac{1}{T_0} - \frac{1}{T}\right)\right)`` | liquid | [Romps2017](@citet), ``L`` linear in ``T``, ≈0.1% accurate |
-| `IFSMixedPhase` | ``\alpha e_{s,l} + (1 - \alpha) e_{s,i}``, ``e_{s,x} = e_0 \exp\left(a_x \frac{T - T_0}{T - b_x}\right)`` | liquid, ice, mixed | as in the ECMWF IFS [IFSCycle49r1](@cite), ``\alpha = \left(\frac{T - T_{ice}}{T_0 - T_{ice}}\right)^2`` between -23˚C and 0˚C |
+| `IFSMixedPhase` (default) | ``\alpha e_{s,l} + (1 - \alpha) e_{s,i}``, ``e_{s,x} = e_0 \exp\left(a_x \frac{T - T_0}{T - b_x}\right)`` | liquid, ice, mixed | as in the ECMWF IFS [IFSCycle49r1](@cite), ``\alpha = \left(\frac{T - T_{ice}}{T_0 - T_{ice}}\right)^2`` between -23˚C and 0˚C |
 | `MagnusBolton` | ``e_0 \exp\left(a \frac{T_c}{T_c + b}\right)``, ``T_c`` in ˚C | liquid | [Bolton1980](@citet), ≈0.1% accurate between -35˚C and 35˚C |
 
 For Romps (2017) the exponents are ``a = (c_{pv} - c_{vl})/R_v`` and
@@ -68,7 +68,10 @@ For reference, [MurphyKoop2005](@citet) give 19.0 (12.8 over ice), 125.6 (103.2 
 
 ## User interface
 
-The default is Clausius-Clapeyron with a constant latent heat (as in previous versions).
+The default is `IFSMixedPhase`, as it is the only formulation with an ice phase and accurate to
+within 0.7% (relative to Goff-Gratch over ice below -23˚C, liquid above 0˚C, blended in between)
+between -100˚C and 100˚C. Clausius-Clapeyron with a constant latent heat was the default
+in previous versions, use `saturation = ClausiusClapeyronConstantL(spectral_grid)` to reproduce them.
 Choose another formulation through the atmosphere
 
 ```@example svp
@@ -106,8 +109,8 @@ reevaporation, so that both stay consistent with the chosen formulation.
 
 !!! note "Convection still assumes constant latent heat"
     The moist-adiabatic lapse rate in [Convection](@ref) still uses
-    ``\partial q_s/\partial T = q_s L_v/(R_v T^2)`` implicitly, which is exact only for the
-    default `ClausiusClapeyronConstantL`.
+    ``\partial q_s/\partial T = q_s L_v/(R_v T^2)`` implicitly, which is exact only for
+    `ClausiusClapeyronConstantL`.
 
 ## Define your own formulation
 

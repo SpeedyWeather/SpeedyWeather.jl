@@ -51,22 +51,16 @@ end
         e⁻ = SpeedyWeather.saturation_vapor_pressure(svp, T - 1.0e-9, atmosphere)
         @test e⁺ ≈ e⁻ rtol = 1.0e-6
     end
-
-    # TetensEquation gradient (sign error fixed)
-    tetens = SpeedyWeather.TetensEquation{Float64}()
-    for T in (253.15, 263.15, 283.15, 303.15)
-        e⁺ = SpeedyWeather.saturation_vapor_pressure(tetens, T + h)
-        e⁻ = SpeedyWeather.saturation_vapor_pressure(tetens, T - h)
-        @test SpeedyWeather.grad(tetens, T) ≈ (e⁺ - e⁻) / 2h rtol = 1.0e-6
-    end
 end
 
 @testset "Saturation vapor pressure in EarthAtmosphere" begin
     spectral_grid = SpectralGrid(truncation = 16, nlayers = 2)
 
-    # default is Clausius-Clapeyron with constant L, bit-identical to the previous formula
-    atmosphere = EarthAtmosphere(spectral_grid)
-    @test atmosphere.saturation isa ClausiusClapeyronConstantL{Float32}
+    # default is the IFS mixed phase formulation
+    @test EarthAtmosphere(spectral_grid).saturation isa IFSMixedPhase{Float32}
+
+    # Clausius-Clapeyron with constant L is bit-identical to the previous default
+    atmosphere = EarthAtmosphere(spectral_grid, saturation = ClausiusClapeyronConstantL(spectral_grid))
     for T in (230.0f0, 273.15f0, 300.0f0)
         e_old = 610.78f0 * exp(atmosphere.latent_heat_condensation / atmosphere.R_vapor * (inv(273.15f0) - inv(T)))
         @test SpeedyWeather.saturation_vapor_pressure(T, atmosphere) === e_old
@@ -94,8 +88,8 @@ end
         end
     end
 
-    # for the default this is the previously hardcoded Clausius-Clapeyron derivative
-    atmosphere = EarthAtmosphere(Float64)
+    # for constant L this is the previously hardcoded Clausius-Clapeyron derivative
+    atmosphere = EarthAtmosphere(Float64, saturation = ClausiusClapeyronConstantL(Float64))
     (; latent_heat_condensation, R_vapor) = atmosphere
     for T in (250.0, 280.0, 300.0)
         qₛ = SpeedyWeather.saturation_humidity(T, 8.0e4, atmosphere)

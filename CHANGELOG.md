@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Saturation vapor pressure formulations `ClausiusClapeyronConstantL` (default, unchanged), `ClausiusClapeyronLinearL` (Romps 2017), `IFSMixedPhase` and `MagnusBolton`, each with analytical derivative `grad`, chosen via `EarthAtmosphere(spectral_grid; saturation)`; field `EarthAtmosphere.saturation_vapor_pressure` moved into `ClausiusClapeyronConstantL.e₀`, sign error in `grad(::TetensEquation)` fixed; `ImplicitCondensation` uses the derivative of the chosen formulation via `grad_saturation_humidity` [#1441](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1441)
+- Saturation vapor pressure formulations `ClausiusClapeyronConstantL` (previous default), `ClausiusClapeyronLinearL` (Romps 2017), `IFSMixedPhase` (new default, with ice phase) and `MagnusBolton`, each with analytical derivative `grad`, chosen via `EarthAtmosphere(spectral_grid; saturation)`; field `EarthAtmosphere.saturation_vapor_pressure` moved into `ClausiusClapeyronConstantL.e₀`, unused `TetensEquation` removed (superseded by `MagnusBolton` and `IFSMixedPhase`); `ImplicitCondensation` uses the derivative of the chosen formulation via `grad_saturation_humidity` [#1441](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1441)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Interpolation (of initial conditions/boundary conditions) always in model precision; Reactant tests revised [#1438](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1438)

@@ -70,13 +70,13 @@ $(TYPEDFIELDS)"""
     @param dry_lapse_rate::NF = 9.8 / 1000
 
     "[OPTION] Saturation vapor pressure formulation, see `subtypes(SpeedyWeather.AbstractSaturationVaporPressure)`"
-    saturation::SVP = ClausiusClapeyronConstantL{NF}()
+    saturation::SVP = IFSMixedPhase{NF}()
 end
 
 Adapt.@adapt_structure EarthAtmosphere
 EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere(SG.NF; kwargs...)
 EarthAtmosphere(::Type{NF}; kwargs...) where {NF} = EarthAtmosphere{NF}(; kwargs...)
-EarthAtmosphere{NF}(; saturation = ClausiusClapeyronConstantL{NF}(), kwargs...) where {NF} =
+EarthAtmosphere{NF}(; saturation = IFSMixedPhase{NF}(), kwargs...) where {NF} =
     EarthAtmosphere{NF, typeof(saturation)}(; saturation, kwargs...)
 Base.eltype(::EarthAtmosphere{NF}) where {NF} = NF
 
@@ -136,7 +136,7 @@ saturation_vapor_pressure(T, A::AbstractDryAtmosphere) = zero(T)
 """$(TYPEDSIGNATURES)
 Saturation water vapor pressure [Pa] as a function of temperature `T` [K] using the
 formulation `A.saturation`, see `subtypes(SpeedyWeather.AbstractSaturationVaporPressure)`.
-Defaults to the Clausius-Clapeyron equation with constant latent heat of condensation."""
+Defaults to `IFSMixedPhase`, Tetens over liquid water and ice with a mixed phase in between."""
 @inline saturation_vapor_pressure(T, A::AbstractWetAtmosphere) = saturation_vapor_pressure(A.saturation, T, A)
 
 """$(TYPEDSIGNATURES)
@@ -167,63 +167,4 @@ using the derivative `grad` of the saturation vapor pressure formulation `A.satu
     deₛ_dT = grad_saturation_vapor_pressure(T, A)
     ϵ = A.mol_ratio
     return ϵ * deₛ_dT / p
-end
-
-export TetensEquation
-
-"""
-Parameters for computing saturation vapor pressure of water using the Tetens' equation,
-
-    eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - T₀ + Tᵢ)),
-
-where T is in Kelvin (so T - T₀ in ˚C) and i = 1, 2 for saturation above and below freezing,
-respectively. From Tetens (1930), and Murray (1967) for below freezing.
-$(TYPEDFIELDS)"""
-@kwdef struct TetensEquation{NF <: AbstractFloat}
-    "Saturation water vapor pressure at 0°C [Pa]"
-    e₀::NF = 610.78
-
-    "0°C in Kelvin"
-    T₀::NF = 273.15
-
-    "Tetens denominator (water) [˚C]"
-    T₁::NF = 237.3
-
-    "Tetens denominator following Murray (1967, below freezing) [˚C]"
-    T₂::NF = 265.5
-
-    "Tetens numerator scaling [1], above freezing"
-    C₁::NF = 17.27
-
-    "Tetens numerator scaling [1], below freezing"
-    C₂::NF = 21.875
-end
-
-"""
-$(TYPEDSIGNATURES)
-Saturation water vapor pressure as a function of temperature using the
-Tetens equation,
-
-    eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - T₀ + Tᵢ)),
-
-where T is in Kelvin (so T - T₀ in ˚C) and i = 1, 2 for saturation above and below freezing,
-respectively."""
-@inline function saturation_vapor_pressure(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
-    (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
-    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
-    temp_celsius = temp_kelvin - T₀
-    return e₀ * exp(C * temp_celsius / (temp_celsius + T))
-end
-
-# Keep functor for backwards compatibility
-@inline (TE::TetensEquation)(temp_kelvin) = saturation_vapor_pressure(TE, temp_kelvin)
-
-"""
-$(TYPEDSIGNATURES)
-Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."""
-@inline function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
-    (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
-    e = saturation_vapor_pressure(TetensCoefficients, temp_kelvin)  # saturation vapor pressure
-    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))   # change coefficients above/below freezing
-    return e * C * T / (temp_kelvin - T₀ + T)^2           # chain rule: times derivative of inner function
 end

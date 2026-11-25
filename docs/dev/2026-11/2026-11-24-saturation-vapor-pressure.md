@@ -40,6 +40,13 @@ Base revision: 75bf89d9aeac994eb8857a06d136a5ceafec0099
 >   function". New `grad_saturation_humidity(T, p, A) = ε/p deₛ/dT`, used for both the implicit
 >   condensation divisor and the reevaporation limiter. Convection's moist adiabat still implicitly
 >   assumes constant L (left for a follow-up).
+> - 2026-11-25: "Can you change to IFSMixedPhase as default? Also why is the Tetens equation still in
+>   src/dynamics/atmosphere.jl?" Default switched to `IFSMixedPhase` (only formulation with ice,
+>   within 0.7% of Goff-Gratch from -100˚C to 100˚C; changes results, `new defaults` label).
+>   `TetensEquation` first moved to `parameterizations/thermodynamics.jl`, then ("did you correct
+>   TetensEquation or is that now simply overhauled by MagnusBolton? If the latter then delete?")
+>   removed: unused, liquid branch superseded by `MagnusBolton`, ice branch by `IFSMixedPhase`.
+>   Exported, so a UI change, covered by the pending `0.26.0-DEV`.
 
 ## Problem description
 
@@ -64,17 +71,17 @@ ice coefficients with a quadratic blend between -23˚C and 0˚C).
   `saturation_vapor_pressure(svp, T, atmosphere)` and `grad(svp, T, atmosphere)` = deₛ/dT [Pa/K].
   The atmosphere argument lets a formulation take consistent constants (Lᵥ, Rᵥ) from it.
 - Four implementations (all isbits, `NF`-parametric, GPU-safe):
-  1. `ClausiusClapeyronConstantL` (default, e₀ = 610.78 Pa, T₀ = 273.15 K, Lᵥ and Rᵥ from the
+  1. `ClausiusClapeyronConstantL` (previous default, e₀ = 610.78 Pa, T₀ = 273.15 K, Lᵥ and Rᵥ from the
      atmosphere) — bit-identical to the current formula.
   2. `ClausiusClapeyronLinearL` (Romps 2017, over liquid, own constants at the triple point).
-  3. `IFSMixedPhase` (Tetens over water and ice, quadratic blend, ECMWF IFS Cy47r3 Part IV).
+  3. `IFSMixedPhase` (new default; Tetens over water and ice, quadratic blend, ECMWF IFS Cy47r3 Part IV).
   4. `MagnusBolton` (Bolton 1980, over liquid).
 - `EarthAtmosphere{NF}` → `EarthAtmosphere{NF, SVP}` with new field `saturation::SVP`;
   field `saturation_vapor_pressure` (e₀) removed. Convenience constructors default to
-  `ClausiusClapeyronConstantL(NF)`.
+  `IFSMixedPhase(NF)`.
 - `saturation_vapor_pressure(T, A)` and `saturation_humidity(T, p, A)` keep their signatures and
   forward to `A.saturation`. New `grad_saturation_humidity(T, p, A)` used by `ImplicitCondensation` (implicit divisor and reevaporation limiter) instead of the hardcoded Clausius-Clapeyron derivative.
-- `TetensEquation` kept as is but its `grad` sign error fixed and its docstrings corrected.
+- `TetensEquation` (unused, `grad` with a sign error) removed, superseded by `MagnusBolton` and `IFSMixedPhase`.
 - SpeedyWeather version `0.26.0-DEV` already carries a `-DEV` tag (unreleased minor bump), so no further bump is needed.
 
 ## Testing and verification
@@ -82,9 +89,9 @@ ice coefficients with a quadratic blend between -23˚C and 0˚C).
 `test/parameterizations/thermodynamics.jl`:
 - each formulation: value against reference values (Murphy and Koop 2005) within a tolerance,
   `grad` against centred finite differences in Float64 over -60…45˚C,
-- default atmosphere bit-identical to the old formula, `saturation_humidity` forwards,
+- `ClausiusClapeyronConstantL` bit-identical to the old formula, default is `IFSMixedPhase`, `saturation_humidity` forwards,
 - continuity of `IFSMixedPhase` at the blend boundaries,
-- Float32 type stability, `TetensEquation` grad fix.
+- Float32 type stability.
 
 ## Documentation changes
 
@@ -100,5 +107,5 @@ interface (`EarthAtmosphere(spectral_grid, saturation = MagnusBolton(spectral_gr
 ## Future work
 
 - Use `grad` in convection's moist adiabat; possibly a fused value-and-derivative to save an `exp`.
-- Ice branch for Romps; decide on a new default.
+- Ice branch for Romps.
 - Consistent latent heat L(T) in the condensation heating.
