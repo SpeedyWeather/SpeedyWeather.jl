@@ -90,21 +90,6 @@ end
 set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...) =
     set!(getfield(variables, group), args...; kwargs...)
 
-export truncate_extra_degree!
-
-"""$(TYPEDSIGNATURES)
-Set the extra degree of the spectral variable(s) `vars` to zero, i.e. all harmonics with a degree
-``l`` larger than the truncation (``l > m_{max}``, a no-op for square `LowerTriangularArray`s).
-All spectral variables carry one more degree ``l_{max} = m_{max}+1`` (1-based) as vector quantities
-(e.g. ``u, v`` or gradients) need it for the meridional derivative. Scalar quantities, which all
-prognostic variables are, must not use it: the dynamical core never changes this degree (its
-tendencies are zero there), but it would still enter the grid-point fields in every time step.
-Recurses into (namespaced) `NamedTuple`s, e.g. `vars.prognostic`, and leaves non-spectral
-variables untouched."""
-truncate_extra_degree!(L::LowerTriangularArray) = SpeedyTransforms.spectral_truncation!(L)
-truncate_extra_degree!(vars::NamedTuple) = (foreach(truncate_extra_degree!, values(vars)); vars)
-truncate_extra_degree!(var) = var     # grid variables, clock, ...
-
 # set LTA <- LTA
 function set!(
         var::LowerTriangularArray,
