@@ -26,7 +26,7 @@ const ATOL = 1.0e-8         # absolute tolerance for the comparisons in test_may
 
 # Tolerances of the CPU-vs-Reactant comparisons in test_correctness.jl, norm-relative for every variable,
 # `norm(cpu - reactant) <= rtol * max(norm(cpu), norm(reactant))`, `default` for variables not listed.
-# About 10x the largest differences measured (macOS arm64, Reactant 0.2.309, 2026-11-25, see
+# About 10x the largest differences measured (macOS arm64, Reactant 0.2.309, 2026-11-24, see
 # docs/dev/2026-11/2026-11-24-reactant-default-primitive-wet-correctness.md). `tendencies`: one time
 # step from identical states, rounding differences only (the spectral divergence, temperature and pressure
 # tendencies are sums of terms that largely cancel). `time_stepping`: after NSTEPS time steps, rounding
