@@ -27,7 +27,7 @@ restart_spectral_grid(architecture) = SpectralGrid(; architecture, truncation = 
     simulation = initialize!(model)
     spectrum = restart_spectral_grid(SpeedyWeather.CPU()).spectrum
     vorticity = rand(ComplexF32, spectrum, size(simulation.variables.prognostic.vorticity)[2:end]...)
-    truncate_extra_degree!(vorticity)
+    LowerTriangularArrays.truncate_extra_degree!(vorticity)
     copyto!(simulation.variables.prognostic.vorticity, SpeedyWeather.on_architecture(ReactantDevice(), vorticity.data))
     simulation.variables.prognostic.clock.time = DateTime(2001, 3, 4, 5, 6)
 
