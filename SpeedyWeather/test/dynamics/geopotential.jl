@@ -63,13 +63,65 @@ end
             @test all(Φ[:, k] .> Φ[:, k + 1])
         end
 
-        # Bernoulli potential on the grid is ½(u²+v²) + Φ
+        # Bernoulli potential on the grid is ½(u²+v²) + Φ minus its mean on every layer and minus the
+        # surface geopotential (added in spectral space instead)
         SpeedyWeather.bernoulli_grid_potential!(vars, model, model.time_stepping)
         u = get_step(vars.grid.u, 2)
         v = get_step(vars.grid.v, 2)
         bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
-        @test bernoulli_grid ≈ @. (u^2 + v^2) / 2 + Φ
+        Φ_mean = sum(Φ.data, dims = 1) ./ size(Φ.data, 1)
+        Φₛ = model.planet.gravity .* model.orography.orography.data
+        @test bernoulli_grid.data ≈ @. (u.data^2 + v.data^2) / 2 + (Φ.data - Φ_mean) - Φₛ
+
+        # with the spectral surface geopotential it has the same ∇² as ½(u²+v²) + Φ
+        S = model.spectral_transform
+        bernoulli = get_step(vars.dynamics.kinetic_energy)
+        transform!(bernoulli, bernoulli_grid, S)
+        SpeedyWeather.bernoulli_surface_geopotential!(vars, model)     # + Φₛ in spectral space
+        bernoulli_full = similar(Φ)
+        bernoulli_full.data .= (u.data .^ 2 .+ v.data .^ 2) ./ 2 .+ Φ.data
+        @test ∇²(bernoulli, S) ≈ ∇²(transform(bernoulli_full, S), S) rtol = NF == Float32 ? 1.0e-4 : 1.0e-10
     end
+end
+
+@testset "Bernoulli potential: Float32 accuracy of its ∇²" begin
+    # only the horizontal variations of the geopotential go through the transform, so that ∇² of the
+    # Bernoulli potential (in the divergence tendency) in Float32 is close to the Float64 transform of the
+    # same values. With the full geopotential (up to ~1e6 m²/s²) the transform's rounding errors are larger
+    nlayers = 8
+    spectral_grid = SpectralGrid(NF = Float32; nlayers)
+    model = PrimitiveWetModel(spectral_grid)
+    simulation = initialize!(model)
+    vars = simulation.variables
+    S = model.spectral_transform
+    SpeedyWeather.transform!(vars, model, initialize = true)   # u, v, Φ on the grid
+
+    SpeedyWeather.bernoulli_grid_potential!(vars, model, model.time_stepping)
+    bernoulli = transform(get_step(vars.dynamics.grid.kinetic_energy), S)
+    bernoulli.data .+= model.orography.surface_geopotential.data
+
+    # reference: Float64 transform of the full Bernoulli potential from the same Float32 values
+    u, v = get_step(vars.grid.u, 2), get_step(vars.grid.v, 2)
+    Φ, orography = vars.dynamics.geopotential, model.orography.orography
+    g = Float64(model.planet.gravity)
+    spectral_grid64 = SpectralGrid(NF = Float64; nlayers)
+    S64 = SpectralTransform(spectral_grid64)
+    reference_grid = zeros(Float64, spectral_grid64.grid, nlayers)
+    reference_grid.data .= (Float64.(u.data) .^ 2 .+ Float64.(v.data) .^ 2) ./ 2 .+
+        (Float64.(Φ.data) .- g .* Float64.(orography.data))
+    reference = transform(reference_grid, S64)
+    reference.data .+= model.orography.surface_geopotential.data
+    ∇²reference = ∇²(reference, S64)
+    relative_error(∇²bernoulli) = norm(∇²bernoulli.data .- ∇²reference.data) / norm(∇²reference.data)
+
+    # the full geopotential through the transform, as before
+    bernoulli_full = similar(Φ)
+    bernoulli_full.data .= (u.data .^ 2 .+ v.data .^ 2) ./ 2 .+ Φ.data
+    error_full = relative_error(∇²(transform(bernoulli_full, S), S))
+    error_anomaly = relative_error(∇²(bernoulli, S))
+
+    @test error_anomaly < 1.0e-6        # a few eps(Float32)
+    @test error_anomaly < error_full / 5
 end
 
 @testset "Grid-space geopotential: analytical check" begin
