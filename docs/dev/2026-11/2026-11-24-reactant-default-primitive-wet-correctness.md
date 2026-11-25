@@ -1,9 +1,8 @@
 # Reactant correctness of the default PrimitiveWetModel
 
-> Status: **in progress**. The default PrimitiveWetModel on Reactant reproduces the CPU to rounding
-> (Float32 and Float64) after fixing the Float32 interpolation of the orography (10052ecf, 99e710f6 on
-> `mg/reactant-tests-all-models`; its regression test not yet committed), test changes committed (not
-> pushed) on `mg/reactant-restart`.
+> Status: **in progress**. Default PrimitiveWetModel on Reactant reproduces the CPU to rounding; the largest
+> deviations (divergence) came from the Float32 transform of the full geopotential in the Bernoulli
+> potential, fixed (§12), tolerances tightened; the Bernoulli fix and new tolerances uncommitted (on top of 70cfdf95).
 
 Date of initial draft: 2026-11-24
 
@@ -42,6 +41,11 @@ model via `model_kwargs`, so it now differentiates the default model too; not ye
 
 §10 (climatologies, all five file-based climatologies converted to the model's number format before
 interpolating) and §11 (tolerances).
+
+> okay your task is now to find the culprit for the biggest deviations between both models, this seems to
+> be in the divergence. Try to work on use decreasing these tolerences in the end
+
+§12.
 
 ## Problem description
 
@@ -312,6 +316,128 @@ Barotropic 8/8 (both transforms), ShallowWater 14/14, PrimitiveDry 17/17, Primit
 transforms). The primitive models reproduce the measured differences bitwise (deterministic), the
 Barotropic model's vary slightly between runs (random initial conditions, 2.2e-6 vs 2.4e-6 vorticity).
 
+### 12. The divergence deviations
+
+One time step of the default PrimitiveWetModel (Float32, MatrixSpectralTransform) split into its stages,
+each stage from identical inputs (CPU directly, Reactant compiled with `reactant_compile_options()` per
+stage, all variables compared, then Reactant resynced to the CPU; 10-day CPU spin-up). Largest
+norm-relative difference per stage, in units of eps(Float32) = 1.2e-7:
+
+| stage | largest difference |
+|---|---|
+| `reinitialize!` (implicit S⁻¹) | 0.6 eps |
+| parameterizations (column kernel) | rain_rate_convection 212, tendencies.grid.temperature 153, cloud_cover 120, outgoing_shortwave 94, tendencies.grid.humidity 93, surface_shortwave_down 46, ocean albedo 45 eps |
+| ocean, sea ice, land | ≤ 0.7 eps |
+| pressure_gradient_flux!, vertical_integration!, vertical_velocity! | ≤ 0.7 eps |
+| vertical_advection! | 6.3 eps (grid temperature tendency) |
+| grid_tendencies! | ≤ 0.4 eps |
+| transform grid → spectral | ≤ 4.1 eps |
+| vordiv_spectral_tendencies! | vorticity 4.2, divergence 0.6 eps |
+| temperature/humidity spectral tendency | 6.2 / 0.9 eps |
+| bernoulli_spectral_potential! | divergence 3.1 eps |
+| horizontal_diffusion!, implicit_correction! | ≤ 0.9 eps |
+| update_prognostic!, transform spectral → grid | ≤ 1.3 eps (river runoff rate 38 eps) |
+
+The dynamical core, the divergence included, agrees to a few eps per stage; the parameterizations are
+the outlier by ~30x. Yet the test's one-step divergence tendency differs by 1.8e-3 (~15000 eps).
+
+Cumulative over the stages of one step (no resync), the spectral tendencies after each stage:
+divergence 4.9 eps after `vordiv_spectral_tendencies!`, then **1.46e-3 (12214 eps) after
+`bernoulli_spectral_potential!`**, 1.83e-3 after diffusion, 1.64e-3 after the implicit correction, which
+couples it into temperature (9.3e-6 → 1.85e-4) and pressure (1.4e-6 → 1.25e-4). The full compiled
+`time_step!` from the same state gives the same (divergence 1.68e-3, temperature 2.3e-4, pressure
+1.4e-4), so compiling stages separately doesn't matter.
+
+**Culprit**: `bernoulli_spectral_potential!` subtracts ∇² of the Bernoulli potential
+`½(u²+v²) + Φ (+ R Tₖ ln pₛ)`, which since #1381 ("Compute geopotential once in grid space", 2026-11-08)
+contains the full grid-point geopotential Φ: up to ~9e5 m²/s² (#1381's plan), dominated by the layer
+height and the surface geopotential, while only its horizontal variations (~1e3-1e4) matter for ∇².
+In Float32 the grid → spectral transform of this large field has rounding errors of a few eps of its
+norm (3.6e-7 of 1.3e6 for `dynamics.kinetic_energy`, CPU vs Reactant), spread over all wavenumbers;
+∇² multiplies them by l(l+1) (up to ~1000 at T32), and the divergence tendency is ~17x smaller than the
+Bernoulli potential. On identical inputs the stage itself is exact to 3 eps, but its input differs by
+the transform's rounding. Not a Reactant bug: the CPU's Float32 divergence tendency has errors of the
+same size, CPU and Reactant only round differently. Before #1381 the geopotential for ∇² was computed in
+spectral space from the spectral temperature (each wavenumber with its own, small rounding error).
+
+Experiment E1: transform only the horizontally varying part, `½(u²+v²) + (Φ - g·h - mean_k(Φ - g·h))`
+on the grid (g·h the surface geopotential, mean over the grid points of each layer), and add the
+spectral surface geopotential `orography.surface_geopotential` (= g × transform of the grid
+orography, for all orographies and `set!`) to the spectral Bernoulli potential with R Tₖ ln pₛ in
+`linear_pressure_gradient!`. Mathematically the same (∇² of a per-layer constant is 0 on the
+Gaussian grids, Φₛ spectrally as before #1381). PrimitiveWet, MatrixSpectralTransform, CPU vs
+Reactant (norm-relative):
+
+| | before | E1 | factor |
+|---|---|---|---|
+| tendency divergence | 1.81e-3 | 1.72e-4 | 10.5 |
+| tendency temperature | 2.37e-4 | 2.80e-5 | 8.4 |
+| tendency pressure | 1.42e-4 | 4.06e-5 | 3.5 |
+| 100 steps: divergence, vorticity | 9.4e-3, 1.6e-3 | 9.9e-3, 1.6e-3 | ~1 |
+
+The 100-step differences don't change: a 1-ulp perturbation of the CPU model grows to the same size
+(§3), they are the model's sensitivity (convection switching on/off), not the per-step rounding.
+
+Accuracy on the CPU alone (not just CPU vs Reactant): ∇²B in Float32 vs a Float64 evaluation of the same
+Float32 grid values (Φₛ from its spectral definition), 10-day spin-up, T32L8, relative error:
+
+| | SpectralTransform | MatrixSpectralTransform |
+|---|---|---|
+| current: ½(u²+v²) + Φ | 1.1e-5 (90 eps) | 2.7e-5 (224 eps) |
+| E1: (Φ - g·h) - mean | 2.7e-6 (22 eps) | 2.7e-6 (23 eps) |
+| V2: (Φ - mean Φ) - g·h | 3.6e-7 (3 eps) | 6.2e-7 (5 eps) |
+| anomaly rounded only once (floor) | 2.9e-7 (2 eps) | 5.8e-7 (5 eps) |
+
+rms of the transformed grid field 1.3e5 → 3.5e3. E1 rounds Φ - g·h at the size of Φ (~2e5 at the
+upper layers), V2 subtracts the layer mean first, exact there (Sterbenz lemma: Φ and its mean within a
+factor 2), then g·h: at the floor, 30-43x more accurate than the current version.
+
+**Fix** (V2, `src/dynamics/tendencies.jl`): `bernoulli_grid_potential!(vars, ::PrimitiveEquation, ...)`
+writes `½(u²+v²) + (Φ - Φ̄ₖ) - g·orography` with Φ̄ₖ = `sum(Φ, dims = 1) / npoints` (a 112-byte allocation on
+the CPU, the CPU time step allocates ~2.5 MB anyway; GPU graphs only capture the transforms), the new
+`bernoulli_surface_geopotential!` adds `orography.surface_geopotential` to the spectral Bernoulli potential
+after `linear_pressure_gradient!` in `spectral_tendencies!`. The `AbstractSpectralTransform` method (for the
+generic `bernoulli_potential!(vars, S, TS)`) keeps the full Φ. Tests (`test/dynamics/geopotential.jl`):
+the grid formula, the same ∇² as ½(u²+v²) + Φ with the spectral Φₛ (Float64 rtol 1e-10, Float32 1e-4), and
+"Bernoulli potential: Float32 accuracy of its ∇²" (initial conditions: 3.3e-7 vs 1.1e-5 with the full Φ,
+tested < 1e-6 and < 1/5 of the full-Φ error). All `geopotential.jl` tests pass (Julia 1.12).
+
+Correctness tests with the fix, all six configurations pass with the previous tolerances; norm-relative
+CPU-vs-Reactant differences before → after (largest over the configurations where it matters):
+
+| | before | after | factor |
+|---|---|---|---|
+| tendencies: divergence (Dry, Wet M, Wet S) | 5.6e-4, 1.8e-3, 1.1e-3 | 2.8e-5, 8.8e-5, 4.2e-5 | 20-25 |
+| tendencies: temperature | 1.1e-4, 2.4e-4, 1.5e-4 | 6.5e-6, 1.6e-5, 9.2e-6 | 15-17 |
+| tendencies: pressure | 3.3e-5, 1.4e-4, 9.6e-5 | 1.0e-5, 3.9e-5, 1.5e-5 | 3-6.5 |
+| PrimitiveDry 100 steps: divergence, vorticity, u, v, temperature | 6.6e-4, 7.8e-5, 4.1e-5, 1.7e-4, 1.4e-6 | 1.6e-4, 1.7e-5, 1.0e-5, 3.1e-5, 5.9e-7 | 2.4-5.5 |
+| PrimitiveWet 100 steps (both transforms) | e.g. divergence 9.9e-3, v 1.9e-3 | 1.4e-2, 2.8e-3 | 0.7-1.2 |
+| Barotropic, ShallowWater | | | 1 (unchanged code path) |
+
+The dry model's 100-step differences were dominated by the Bernoulli noise too (no convection), the wet
+model's remain those of its sensitivity to any perturbation.
+
+New tolerances (`runtests.jl`), ~10x the largest measured difference (6.5x-20x):
+
+| | before | after |
+|---|---|---|
+| primitive tendencies: divergence, temperature, pressure | 2e-2, 3e-3, 2e-3 | 1e-3, 2e-4, 5e-4 |
+| primitive tendencies: default (vorticity, humidity) | 1e-4 | 1e-4 |
+| PrimitiveDry 100 steps (own set, was shared with Wet) | 2e-2 (vorticity, v, humidity), u 1e-2, divergence 1e-1, temperature 5e-4, pressure 2e-5 | default (vorticity, u) 2e-4, v 5e-4, divergence 2e-3, temperature 1e-5, pressure 3e-6 |
+| PrimitiveWet 100 steps | unchanged | unchanged |
+| one-layer models | unchanged | unchanged |
+
+Verification with these tolerances, all six configurations: Barotropic 8/8 (both transforms),
+ShallowWater 14/14, PrimitiveDry 17/17, PrimitiveWet 24/24 (both transforms); the primitive models
+reproduce the measured differences bitwise.
+
+Further checks of the Bernoulli change: CPU tests (Julia 1.12, `--check-bounds=yes`) `dynamics/implicit.jl`,
+`dynamics/vertical_advection.jl`, `dynamics/time_stepping.jl` (incl. bit reproducibility, single steps vs
+`run!`), `dynamics/matrix_transform.jl`, `variables/fuse.jl` (128/128) pass; Enzyme reverse mode through
+`bernoulli_grid_potential!` (reactant env, Julia 1.11): finite non-zero gradients, the gradient with respect
+to Φ sums to zero on every layer (layer mean subtracted), 3/3. Not run: the differentiability test suite
+(`test/differentiability`, separate CI), GPU tests.
+
 ## Summary of changes
 
 - `SpeedyWeather/test/reactant/setup.jl`: `model_kwargs` is `(;)` for the PrimitiveWetModel, all
@@ -323,8 +449,13 @@ Barotropic model's vary slightly between runs (random initial conditions, 2.2e-6
   and CPU and Reactant get the same orography.
 - `SpeedyWeather/test/reactant/test_interpolation.jl`: test "EarthOrography on Reactant in Float64".
 - `SpeedyWeather/test/reactant/runtests.jl`, `test_correctness.jl`: norm-relative tolerances per model
-  family (one-layer, primitive) for the tendencies and the time stepping, the norm-relative difference
-  is printed for every variable (§11).
+  (one-layer, PrimitiveDry, PrimitiveWet) for the tendencies and the time stepping, the norm-relative
+  difference is printed for every variable (§11, §12).
+- `SpeedyWeather/src/dynamics/tendencies.jl`: the grid Bernoulli potential of the primitive equation
+  models without the layer mean of the geopotential and without the surface geopotential (added in
+  spectral space by the new `bernoulli_surface_geopotential!`): 30-43x smaller Float32 rounding errors in
+  ∇² of the Bernoulli potential, 20-25x smaller CPU-vs-Reactant differences in the divergence tendency
+  (§12); tests in `test/dynamics/geopotential.jl`.
 - `ocean.jl`, `land/soil_temperature.jl`, `land/soil_moisture.jl`, `land/vegetation.jl`,
   `radiation/albedo/general.jl`: the climatologies too are interpolated in the model's number format;
   test "Climatologies on Reactant in Float64".
@@ -353,6 +484,14 @@ Barotropic model's vary slightly between runs (random initial conditions, 2.2e-6
   ~1e-3 (norm-relative) in vorticity/divergence/humidity.
 
 ## Future work
+
+- The PrimitiveWetModel's 100-step comparison is limited by its sensitivity: any perturbation, also 1 ulp,
+  grows to ~1e-3-1e-2 in 100 steps (§3). Tighter tolerances there need a shorter comparison (in §3 after
+  20 steps vorticity 5e-5, divergence 4e-4, humidity 3e-6, i.e. 30-500x smaller than after 100) or a
+  Float64 comparison (§8: ≤ 2e-12 after 100 steps).
+- The parameterizations are now the largest per-stage CPU-vs-Reactant difference (~100-200 eps:
+  convective rain, temperature tendency, cloud cover, shortwave; §12), most likely the same cancellation
+  in the convection's T - T_ref of nearly equal temperatures.
 
 - A Float64 CPU-vs-Reactant comparison of the default PrimitiveWetModel in CI (CPU spin-up copied to
   Reactant, one compiled time step, all variables incl. nested namespaces and parameterizations,
