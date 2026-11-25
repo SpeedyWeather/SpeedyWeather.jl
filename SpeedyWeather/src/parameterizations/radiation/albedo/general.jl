@@ -195,7 +195,9 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         version = albedo.version
     )
 
-    a = on_architecture(model.architecture, a)
+    # in the model's precision to interpolate in it, not in that of the file (Float32), see EarthOrography
+    NF = eltype(albedo.albedo)
+    a = on_architecture(model.architecture, Field(convert.(NF, a.data), a.grid, a.dims))
     return interpolate!(albedo.albedo, a)
 end
 
