@@ -77,7 +77,7 @@ end
     @test all(isfinite, sim.variables.grid.pressure)
 
     # Spot-check the Terrarium state itself for NaNs in the soil column.
-    state = sim.variables.prognostic.land.terrarium
+    state = sim.variables.prognostic.land.terrarium.state
     @test all(isfinite, Terrarium.interior(state.temperature))
     @test all(isfinite, Terrarium.interior(state.saturation_water_ice))
     @test all(isfinite, Terrarium.interior(state.skin_temperature))
@@ -93,6 +93,9 @@ end
     @test haskey(land_vars, :soil_moisture_capacity)
     mask = SWTerrarium.land_mask(model.land)
     @test all(0 .< land_vars.soil_moisture_capacity[mask] .<= 1)   # porosity is a volume fraction
+    # the capacity is copied from the coupler-defined porosity Field, computed once at initialization
+    porosity = sim.variables.prognostic.land.terrarium.coupling.soil_porosity
+    @test land_vars.soil_moisture_capacity[mask] ≈ Terrarium.interior(porosity)[:, 1, 1]
     @test all(isfinite, land_vars.albedo)                           # LearnedLandAlbedo now sees real soil moisture
 end
 
@@ -147,7 +150,7 @@ end
     @test all(isfinite, sim.variables.grid.temperature)
     @test all(isfinite, sim.variables.grid.pressure)
 
-    state = sim.variables.prognostic.land.terrarium
+    state = sim.variables.prognostic.land.terrarium.state
     @test all(isfinite, Terrarium.interior(state.temperature))
 end
 
