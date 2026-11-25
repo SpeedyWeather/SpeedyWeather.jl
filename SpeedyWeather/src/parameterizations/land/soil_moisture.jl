@@ -87,8 +87,9 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
         version = soil.version
     )
 
-    # 2 layers, 12 months
-    field = zeros(field_layer1.grid, 2, 12)
+    # 2 layers, 12 months, in the model's precision to interpolate in it, not in that of the file
+    # (Float32), see EarthOrography
+    field = zeros(eltype(monthly_soil_moisture), field_layer1.grid, 2, 12)
     field[:, 1, :] .= field_layer1
     field[:, 2, :] .= field_layer2
     soil_moisture_file = on_architecture(model.architecture, field)

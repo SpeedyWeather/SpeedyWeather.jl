@@ -82,6 +82,12 @@ end
     @test all(isfinite, Terrarium.interior(state.saturation_water_ice))
     @test all(isfinite, Terrarium.interior(state.skin_temperature))
 
+    # The Terrarium state can be moved to the host, e.g. for restart files
+    host_state = SpeedyWeather.on_architecture(SpeedyWeather.CPU(), state)
+    @test host_state isa Terrarium.StateVariables
+    @test Terrarium.interior(host_state.temperature) == Terrarium.interior(state.temperature)
+    @test SpeedyWeather.on_architecture(SpeedyWeather.CPU(), sim.variables.prognostic) isa NamedTuple
+
     # Check soil moisture capacity works correctly
     land_vars = sim.variables.parameterizations.land
     @test haskey(land_vars, :soil_moisture_capacity)

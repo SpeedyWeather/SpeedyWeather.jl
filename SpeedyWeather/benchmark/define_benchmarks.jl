@@ -105,10 +105,11 @@ benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
 )
 
 ## SPEEDY.F90-LIKE CONFIGURATION, opt-in with `--SPEEDY`
-# The PrimitiveWet model with prescribed seasonal climatologies and constant surface roughness, wind
-# slowdown and gusts (`speedy_components` in benchmark_suite.jl), over the same resolutions as the
+# The PrimitiveWet model with every component set explicitly as close to SPEEDY.f90 as SpeedyWeather allows
+# (`speedy_components` in benchmark_suite.jl), over the same resolutions as the
 # PrimitiveWet resolution sweep (benchmark201) with the default transform, to compare row by row.
 if RUN_SPEEDY
+    check_speedy_components(PrimitiveWetModel)
     let
         truncations, nlayers = resolution_sweep()
         nruns = length(truncations)

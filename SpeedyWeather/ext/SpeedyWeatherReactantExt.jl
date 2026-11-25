@@ -130,6 +130,18 @@ nans_detected(feedback::SpeedyWeather.Feedback) = feedback.nans_detected
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNumber(x))
 
+# The clock and the scalar `Ref`s (`scalar_ref`) on the host, with plain dates and numbers instead of Reactant's, e.g.
+# for restart files: stored as Reactant types they can't be read back in another process (their device buffers are
+# gone). `StartFromFile` copies them back into the Reactant variables with `copy!(::Clock, ::Clock)` (which converts)
+# and an assignment into the `Ref`
+function SpeedyWeather.on_architecture(::SpeedyWeather.CPU, clock::SpeedyWeather.Clock{<:ReactantDatesExt.ReactantDateTime})
+    host_clock = SpeedyWeather.Clock()
+    copy!(host_clock, clock)
+    return host_clock
+end
+
+SpeedyWeather.on_architecture(::SpeedyWeather.CPU, x::Base.RefValue{<:Reactant.ConcreteRNumber}) = Ref(Reactant.to_number(x[]))
+
 # TODO: move upstream to Reactant, ReactantDatesExt defines Dates.year(::ReactantDateTime) via
 # Dates.year(days) for which Dates' method branches on the traced month, use yearmonthday instead
 Dates.year(days::Reactant.TracedRNumber) = first(Dates.yearmonthday(days))
@@ -200,16 +212,14 @@ SpeedyWeather.free_troposphere_layers(clouds::SpeedyWeather.DiagnosticClouds, ve
 
 # OUTPUT HANDLING FOR REACTANT
 #
-# Reactant cannot trace through the output! pipeline: `output!` interpolates onto
-# CPU scratch fields and writes to disk, both of which are runtime side effects
-# the tracer can't (and shouldn't) capture. We split the behaviour by tracing context:
+# Writing to disk can't happen inside a compiled program. We split the behaviour by tracing context:
 #   - Inside `@compile` (`within_compile()` == true): `do_output!`, which every output
 #     writer calls to decide whether to write, returns false. Nothing gets baked into
 #     the compiled `time_step!`, so the compiled function only does numerics.
 #   - Outside `@compile`: `time_stepping!` (above) explicitly invokes
-#     `output!(output, simulation)` after each compiled step. The simulation's
-#     data is then ConcretePJRTArrays, which the standard output path can
-#     consume via `on_architecture(CPU(), …)`.
+#     `output!(output, simulation)` between the compiled time steps. Everything of an output
+#     step but the I/O, i.e. `interpolate_output!` of all output variables, is one compiled
+#     program (see `CompiledOutput` below), the host then copies, bitrounds and writes.
 const ReactantClock = SpeedyWeather.Clock{<:ReactantDatesExt.ReactantDateTime}
 
 # same for the feedback (progress meter, NaN detection), skipped inside `@compile`
@@ -259,5 +269,75 @@ end
 # materialise into a plain DateTime and forward to the output-specific DateTime method (NetCDF, Zarr, …)
 SpeedyWeather.output!(output::SpeedyWeather.AbstractOutput, time::ReactantDatesExt.ReactantDateTime) =
     SpeedyWeather.output!(output, convert(DateTime, time))
+
+"""$(TYPEDSIGNATURES)
+Compiled output step of an output writer: `output_func!` computes all output `variables`
+(those that exist in the simulation) with `interpolate_output!` into `fields`, one field on the
+output grid (on the device) per variable. Kept in the output writer's `core.compiled`."""
+struct CompiledOutput{P, V, F}
+    output_func!::P # compiled `interpolate_outputs!`
+    variables::V    # tuple of output variables
+    fields::F       # tuple of fields to compute them into, on the output grid on the device
+end
+
+# Like the feedback, not traced when compiling e.g. the time step (which captures the output writer
+# through the model), so that its fields don't become arguments of every compiled program
+Reactant.traced_type_inner(
+    @nospecialize(T::Type{<:CompiledOutput}), seen, @nospecialize(mode::Reactant.TraceMode),
+    @nospecialize(track_numbers::Type), @nospecialize(ndevices), @nospecialize(runtime),
+) = T
+
+function Reactant.make_tracer(seen, @nospecialize(prev::CompiledOutput), @nospecialize(path), mode; kwargs...)
+    if mode == Reactant.TracedToTypes
+        push!(path, Core.Typeof(prev))
+        return nothing
+    end
+    return prev
+end
+
+# all output variables into their fields, to be compiled as one program
+function interpolate_outputs!(fields::Tuple, variables::Tuple, output, simulation)
+    foreach(fields, variables) do field, variable
+        SpeedyWeather.interpolate_output!(field, output, variable, simulation)
+    end
+    return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
+The compiled output step `output.compiled` for `output_variables`, compiled (and its fields allocated)
+on the first call after `initialize!(output, ...)`, which resets it."""
+function compiled_output!(
+        output::SpeedyWeather.AbstractOutput,
+        output_variables::SpeedyWeather.OUTPUT_VARIABLES_DICT,
+        simulation::ReactantSimulation,
+    )
+    output.compiled isa CompiledOutput && return output.compiled
+    exists(variable) = SpeedyWeather.OutputVariables.exists_in_simulation(variable, simulation)
+    variables = Tuple(filter(exists, collect(values(output_variables))))
+    fields = map(variable -> similar(first(SpeedyWeather.scratch_fields(output, variable))), variables)
+    output_func! = @compile compile_options = reactant_compile_options() interpolate_outputs!(fields, variables, output, simulation)
+    return output.compiled = CompiledOutput(output_func!, variables, fields)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Output all `output_variables` of a Reactant `simulation`: one compiled program computes them all on
+the device (see [`compiled_output!`](@ref)), then every variable is copied to the host, bitrounded and
+written. Variables without a time dimension are only written with the initial conditions."""
+function SpeedyWeather.output!(
+        output::SpeedyWeather.AbstractOutput,
+        output_variables::SpeedyWeather.OUTPUT_VARIABLES_DICT,
+        simulation::ReactantSimulation,
+    )
+    (; output_func!, variables, fields) = compiled_output!(output, output_variables, simulation)
+    output_func!(fields, variables, output, simulation)
+    for (field, variable) in zip(fields, variables)
+        ~SpeedyWeather.OutputVariables.hastime(variable) && output.output_counter > 1 && continue
+        host = last(SpeedyWeather.scratch_fields(output, variable))
+        SpeedyWeather.write_output!(output, variable, field, host)
+    end
+    return nothing
+end
 
 end

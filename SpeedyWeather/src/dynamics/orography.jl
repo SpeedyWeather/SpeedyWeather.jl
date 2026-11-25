@@ -228,7 +228,11 @@ function initialize!(
         version = orog.version
     )
 
-    orography_highres = on_architecture(S.architecture, field)
+    # interpolate in the model's precision, not in that of the file (Float32): otherwise the interpolated
+    # orography depends at the level of Float32 rounding on how the interpolation is compiled (e.g. fused
+    # multiply-adds when raised with Reactant), and differs between architectures also in Float64 models
+    NF = eltype(orography)
+    orography_highres = on_architecture(S.architecture, Field(convert.(NF, field.data), field.grid))
     synchronize(S.architecture)
 
     # Interpolate/coarsen to desired resolution, jitted as one compiled function on Reactant

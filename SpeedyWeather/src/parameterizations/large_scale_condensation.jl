@@ -117,18 +117,21 @@ large-scale precipitation vertically for output."""
             δq_melt = melt_rate * Δtgρ_Δp                   # convert back to humidity increase over timestep [kg/kg]
             δT = -Lᵢ_cₚ * δq_melt / Δt                      # latent heat required for melting [K/s] (explicit in time)
             T = temp[ij, k] + Δt * δT                       # use temperature after melting [K] from here on
-            sat_humid_k_melted = saturation_humidity(T, pₖ, atmosphere) # update saturation humidity post snow melting
             # don't use δq_melt as humidity tendency as it's only snow->rain
+
+            sat_humid_k_melted = saturation_humidity(T, pₖ, atmosphere) # update saturation humidity post snow melting
+            # derivative of qsat wrt temp
+            dqsat_dT = sat_humid_k_melted * Lᵥ / (Rᵥ * T^2)    # Clausius-Clapeyron [1/K]
 
             # 2. Reevaporation and condensation
             dq = sat_humid_k_melted - humid[ij, k]                # reevaporation relative to 100% humidity
 
             # Scale reevaporation by layer thickness
-            Δσ = Δp / pₛ                                          # layer thickness in σ [1]
+            Δσ = Δp / pₛ                                        # layer thickness in σ [1]
             r = condensation.reevaporation * max(dq, 0) * Δσ / condensation.reevaporation_layer_thickness
-            rain_evaporated = -expm1(-r) * rain_flux_down      # [m/s], fraction [0, 1)
-            γ_evap = 1 + Lᵥ_cₚ * sat_humid_k_melted * Lᵥ / (Rᵥ * T^2)   # 1 + Lᵥ/cₚ ∂q*/∂T, evaporative cooling lowers saturation
-            max_rain_evaporated = max(dq, 0) / γ_evap * Δp_Δtgρ       # evaporate just enough to bring the layer to saturation
+            rain_evaporated = -expm1(-r) * rain_flux_down       # [m/s], fraction [0, 1)
+            γ_evap = 1 + Lᵥ_cₚ * dqsat_dT                       # 1 + Lᵥ/cₚ * ∂q*/∂T, evaporative cooling lowers saturation
+            max_rain_evaporated = max(dq, 0) / γ_evap * Δp_Δtgρ # evaporate just enough to bring the layer to saturation
 
             # Smooth limiter: E = E_trial * C / (E_trial + C) with E_trial = rain_evaporated (from above)
             # and C = max_rain_evaporated, hence the *= below. E < min(E_trial, C) and E ≈ E_trial for E_trial ≪ C
@@ -138,12 +141,9 @@ large-scale precipitation vertically for output."""
             δq_evap = rain_evaporated * Δtgρ_Δp / Δt              # everything evaporated explicitly becomes vapour
 
             # implicit correction for condensation only, Frierson et al. 2006 eq. (21)
-            # derivative of qsat wrt to temp
-            dqsat_dT = sat_humid_k_melted * relative_humidity_threshold * Lᵥ / (Rᵥ * T^2)    # Clausius-Clapeyron [1/K]
-
-            # Implicit divisor of condensation only
             δq_cond_melted = sat_humid_k_melted * relative_humidity_threshold - humid[ij, k]
-            δq_cond_tend = min(0, δq_cond_melted) / ((1 + Lᵥ_cₚ * dqsat_dT) * time_scale * Δt)
+            γ_cond = 1 + Lᵥ_cₚ * relative_humidity_threshold * dqsat_dT # implicit divisor
+            δq_cond_tend = min(0, δq_cond_melted) / (γ_cond * time_scale * Δt)
             δq = δq_cond_tend + δq_evap                     # now combine condensation and evaporation tendencies
             δT -= Lᵥ_cₚ * δq                                # add latent heat release to melting for enthalpy conservation
 
