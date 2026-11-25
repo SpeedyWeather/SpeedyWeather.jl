@@ -17,7 +17,7 @@ steps:
     agents:
       queue: "cuda"
     if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
-    timeout_in_minutes: 40
+    timeout_in_minutes: 45
 
   - label: "AMDGPU, Julia v1.13"
     matrix:
@@ -40,4 +40,4 @@ steps:
     # if: "!(build.pull_request.labels includes 'skip-ci' || build.pull_request.labels includes 'skip-gpu-ci')"
     # only run on pushes to main, not on pull requests
     if: "build.branch == 'main' && build.pull_request.id == null"
-    timeout_in_minutes: 40
+    timeout_in_minutes: 50
