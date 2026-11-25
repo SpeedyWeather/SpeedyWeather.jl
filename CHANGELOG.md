@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Saturation vapor pressure formulations `ClausiusClapeyronConstantL` (default, unchanged), `ClausiusClapeyronLinearL` (Romps 2017), `IFSMixedPhase` and `MagnusBolton`, each with analytical derivative `grad`, chosen via `EarthAtmosphere(spectral_grid; saturation)`; field `EarthAtmosphere.saturation_vapor_pressure` moved into `ClausiusClapeyronConstantL.e₀`, sign error in `grad(::TetensEquation)` fixed [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+- Saturation vapor pressure formulations `ClausiusClapeyronConstantL` (default, unchanged), `ClausiusClapeyronLinearL` (Romps 2017), `IFSMixedPhase` and `MagnusBolton`, each with analytical derivative `grad`, chosen via `EarthAtmosphere(spectral_grid; saturation)`; field `EarthAtmosphere.saturation_vapor_pressure` moved into `ClausiusClapeyronConstantL.e₀`, sign error in `grad(::TetensEquation)` fixed [#1441](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1441)
 - Interpolation (of initial conditions/boundary conditions) always in model precision; Reactant tests revised [#1438](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1438)
 - Fixes a bug that restart files of Reactant simulations could not be read back [#1437](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1437)
 - Fixes a bug that NaNs in the output of GPU simulations were written as -0: the NaN that GPU arithmetic produces did not survive the mantissa rounding (`keepbits`), output is now rounded with `round_mantissa!` which keeps NaNs [#1433](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1433)

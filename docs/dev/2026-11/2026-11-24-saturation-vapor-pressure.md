@@ -1,6 +1,6 @@
 # Swappable saturation vapor pressure formulations
 
-> Status: **in progress**. Four formulations with `grad` are implemented as a field of `EarthAtmosphere`; parameterizations are not yet changed.
+> Status: **completed**. Four formulations with `grad` implemented as a field of `EarthAtmosphere` in #1441; parameterizations are not yet changed (follow-up).
 
 Date of initial draft: 2026-11-24
 
