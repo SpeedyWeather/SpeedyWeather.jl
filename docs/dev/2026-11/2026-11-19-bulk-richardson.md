@@ -15,6 +15,10 @@
 > a form of the scheme with the layers in the outer loop that is 2 to 15 times faster on the CPU and 40–45 %
 > faster on the GPU. The bounds-check fixes are implemented (`161719fed`, `a7d67a165`, 8.17.7); the range form is
 > planned in `2026-11-21-vertical-diffusion-range-form.md` and not implemented. Details in section 8.
+> State 2026-11-24: no setup has been stable at T512L24 for 10 years yet. All failures of 2026-11-23/24 (within
+> months with Ri_c = 10, after 4.4–4.5 years with Ri_c = 1) are oscillations of the scheme itself at large
+> diffusivity; an over-implicit solve (`implicitness = 1.5`, in the working tree, uncommitted) removes them in
+> restart tests, and a 10-year run with it is PENDING (8.10, correction of 2026-11-24).
 
 Date of initial draft: 2026-11-19
 
@@ -141,6 +145,22 @@ Tracking issue in the repo: #1282 (vertical diffusion), related #1283, #1335/#13
   - The model validation runs use their own environment and copies of the T512L24 driver scripts in
     `/p/tmp/maxgelbr/code/Speedy2/claude_bulk_richardson_2026-11-19/validation/`, so that nothing in
     `/p/tmp/maxgelbr/t512l24-reactant-10y/` (another session's work) is modified. Its restart files are read only.
+- 2026-11-24, user requests "try the over-implicit weighting in a scratch copy", then "make the changes here in
+  this main workspace, but don't commit them yet" and "Add the concrete reference to the IFS documentation/paper to
+  the main documentation of vertical_diffusion.md": the implicit solve of 4.2 is no longer backward Euler by
+  default. New option `implicitness` (γ, default 1.5 as in the IFS, 1 = backward Euler): the solver is called
+  with γΔt, so that the tendency is the flux divergence of x̂ = γx⁺ + (1 − γ)x⁻. Reason: all T512L24 failures of
+  2026-11-23/24 are oscillations of the scheme at large diffusivity (diffusivity from the previous time step,
+  "fibrillations"), which γ = 1.25, 1.5 and 2 remove in restart tests (8.10, correction of 2026-11-24). Changed,
+  uncommitted: `vertical_diffusion.jl` (option, one line in `vertical_diffusion!`, docstrings), its tests (solver
+  property in the stiff limit, scheme against the solver with γΔt), `docs/src/vertical_diffusion.md` (section
+  "Implicit time integration" with IFS documentation Cy49r1, part IV, section 3.5, eqs. 3.65–3.66), `CHANGELOG.md`.
+- 2026-11-24, user request "I want Ri_c=1 make that change and run this tests on this": the default of
+  `critical_Richardson` is 1 again (was 10 since `1cdc3b1a`), uncommitted, with the paragraph on the boundary
+  layer height in `docs/src/vertical_diffusion.md`. `Richardson_cutoff` stays 10. Reasons in 8.10 (updates of
+  2026-11-23 and 2026-11-24): with 10 the boundary layer reaches the tropopause under the jets, the lowermost
+  layer warms by 4–6 K, the ocean's sensible heat flux reverses, and all T512L24 runs failed within 146 days. The
+  running tests of Ri_c = 10 were stopped and their output deleted on the user's request.
 
 ## 1. Why this matters
 
@@ -887,7 +907,7 @@ together with `Richardson_cutoff = 10`.**
   started 2026-11-23 13:20, about 45 hours each: `t512l24_10y_ric1` (only Ri_c = 1, jobs 3447365–3447372,
   gpupreempt), `t512l24_10y_ric1_drag1e-4` (Ri_c = 1, `drag = 1e-4`, jobs 3447361–3447364, gpushort),
   `t512l24_10y_ric1_cut1_drag1e-4` (Ri_c = 1, cutoff 1, `drag = 1e-4`, jobs 3447373–3447380, gpupreempt).
-  **PENDING: all three.**
+  Results in the update of 2026-11-24: two of the three failed in their fifth year.
 - The later commits `edb7675f2` (range form on the CPU) and `8fd8d214f` (merge of main, "always couple") equal
   `a7d67a165` up to rounding, on CPU and GPU: T32, dry L8, wet L8 and L24, default models, after 1, 5 and 20 steps
   (`$D/../equal_check_steps.jl`, table in `$D/../tests/equal_check_steps_compare.log`), largest difference over
@@ -907,6 +927,194 @@ together with `Richardson_cutoff = 10`.**
   of one commit; this is also what the 3-day comparison showed (1–3 % of the largest vorticity coefficient). So a
   long run on the later code follows another trajectory with, as far as this test can tell, the same statistics.
   No long run covers `8fd8d214f`.
+
+**Update 2026-11-24: with Ri_c = 1 two of three 10-year runs fail after 4.4–4.5 years. The cause is an
+instability of the scheme itself at large diffusivity (correction of 13:15 at the end of this block), not the
+advective limit of the time step as first written here; an over-implicit solve removes it in restart tests.**
+
+> Correction, 2026-11-24 13:15: the reading "leapfrog advective limit" in the bullets below and the table of
+> onset winds per time step are wrong. They are left in place and marked. See "Correction" at the end of the block.
+
+- The three chains on `8fd8d214f` (state 12:00):
+
+  | Run | Result | Highest wind since 2000-02, median / peak [m/s] | Lowest-layer cold events (< −75 °C) |
+  |---|---|---|---|
+  | `t512l24_10y_ric1` (cutoff 10, drag 1e-5) | **NaN on 2004-07-19** (4.55 years) | 92 / 128 | 1 (−92 °C) |
+  | `t512l24_10y_ric1_drag1e-4` (cutoff 10) | **NaN on 2004-06-08** (4.43 years) | 87 / 112 | 0 |
+  | `t512l24_10y_ric1_cut1_drag1e-4` | running, 4.7 years, no NaN | 87 / 113 | 2 (−121 °C, −211 °C) |
+
+  The cold events are all at the Antarctic coastal point (79°S, 81°W) and recover. The layer-mean temperature of
+  layer 12 rises by 0.3 K per year at first and 0.15 K per year in year 4; layers 1 and 24 are steady.
+- Both failures reproduce from the last restart file with a record every 5 minutes
+  (`output/blowup_ric1/run_br_ric1_0001`, `run_br_ric1_drag1e-4_0001`), and neither is the top-layer jet:
+
+  | | `ric1` | `ric1_drag1e-4` |
+  |---|---|---|
+  | Column | 66.4°S, 54.0°E, Antarctic coast, orography 1200 m (0–1700 m within 1°) | 33.4°S, 69.9°W, Andes, orography 3800 m |
+  | Wind in layers 19–24 one hour before [m/s] | 70–75 (10 m wind 41) | 61–70 (10 m wind 44) |
+  | Vertical Courant number σ̇Δt/Δσ, layers 19–22 | 0.11–0.18 | 0.20–0.36 |
+  | Onset | T of layer 21: −23.6, −20.3, −25.0, −16.7, −29.2, −9.4, −39.2, +5.5, −64.3, +37.5, −169 °C in steps of 5 minutes | T of layer 21: −13.5, +7.3, −20.2, +17.1, −29.2, +29.6, −42.4, +50.4, −68.9, +103 °C |
+
+  A zig-zag between the layers that changes sign every two time steps and grows by a factor of about 1.4 each
+  time, for an hour before the NaN. A period of four time steps with slow growth is what the leapfrog scheme does
+  when ωΔt is just above 1. (WRONG reading, see the correction below.) Reading: the wind in the lowest layers, 60–75 m/s and so below the speed limit of
+  80 m/s, already uses 75–90 % of the horizontal limit a/(NΔt) ≈ 83 m/s, and the vertical advection over the slope
+  adds the rest. The speed-limit drag cannot act on this, whatever its coefficient. Winds of 60–75 m/s at 45 m
+  height are themselves unrealistic (not looked into).
+- The failures of the runs with Ri_c = 10 after 28–60 days were at the same kind of place (southern tip of
+  Greenland, Aleutians; update of 2026-11-23). So Ri_c = 10 does not create this failure, it makes it about 30
+  times more frequent.
+- One-day restarts from 6 and 10 hours before, one change each (`submit_restart_8fd8.sh`, option `VADV` added to
+  `run_t512l24_restart_test.jl`; `output/blowup_ric1/run_br_antarctic_*`, `run_br_andes_*`):
+
+  | Change | Antarctic coast (blow-up 08:35) | Andes (blow-up 04:30) |
+  |---|---|---|
+  | Δt = 127.8 s (`Δt_at_T32 = Minute(35)`, i.e. 131.25 s, adjusted by the model to the output interval) | survives | survives |
+  | Δt = 112.5 s (`Δt_at_T32 = Minute(30)`) | survives | survives |
+  | hyperdiffusion 2 h | survives | blow-up 05:25 |
+  | `speed_limit = 60` | blow-up 08:35 with drag 1e-5 (as in this run), 10:05 with drag 1e-4 (job 3467066) | survives (drag 1e-4) |
+  | `WENOVerticalAdvection` | blow-up 07:40 | blow-up 03:30 |
+  | `UpwindVerticalAdvection` (5th order) | blow-up 08:25 | blow-up about 04:25 |
+
+  Only the shorter time step removes both, which fits the reading above; the dissipative vertical advection
+  schemes do not help. As before these are one-day tests of single events.
+- How the wind got there (2-hourly snapshots of the original runs over the 24 hours before): at the Andes column
+  the wind of layers 19–24 is 30–32 m/s until 18:00 of the day before and then 36, 42, 45, 56 m/s every two
+  hours, without a zig-zag; the zig-zag is there at 60–72 m/s. At the Antarctic column it is 50–56 m/s for the
+  whole day before, then 58, 64, 65 m/s, and the zig-zag is there at 75 m/s. So in both the instability sets in
+  at 60–65 m/s, 72–78 % of the horizontal limit, with vertical Courant numbers of 0.15–0.35. The eight
+  half-yearly snapshots of `t512l24_10y_ric1_drag1e-4` have at most 31–51 m/s in the lowest layer anywhere (ocean
+  storms, the Antarctic slope), so these are rare extremes of the resolved flow over steep slopes (a downslope
+  wind event, katabatic flow) and not a general bias that I could show. The model has no subgrid orographic drag.
+- (WRONG, withdrawn: the Aleutian event of the Ri_c = 10 runs has the same oscillation at 62–65 m/s over flat ocean
+  with vertical Courant numbers of 0.01, and without the scheme the winds reach 80–100 m/s in these layers
+  without a blow-up; see the correction below.) Estimate of the wind at which this sets in, from the sum of the Courant numbers U/(a/(NΔt)) + C_z ≤ 1 with the
+  vertical Courant numbers C_z = 0.15–0.36 seen at 150 s (C_z ∝ Δt). Mine, checked only against the two onsets:
+
+  | Δt | Horizontal limit a/(NΔt) | Onset wind in the lowest layers | Relative to `speed_limit = 80` |
+  |---|---|---|---|
+  | 150 s (default) | 83 m/s | 53–71 m/s (seen: 60–65) | far below, the drag never acts |
+  | 129.6 s | 96 m/s | 66–84 m/s | partly below |
+  | 112.5 s | 111 m/s | 81–98 m/s | above: the drag acts first |
+
+  With this estimate 112.5 s is the time step at which the speed limit of 80 m/s protects the lowest layers too;
+  with 129.6 s a speed limit of about 65 m/s would be needed for that, which would also act on real jets.
+- Two 10-year chains with Ri_c = 1, `drag = 1e-4` and a shorter time step, started 2026-11-24 12:07 on `8fd8d214f`:
+  `t512l24_10y_ric1_drag1e-4_dt131` (`Δt_at_T32 = Minute(35)`, which the model adjusts to 129.6 s for the
+  half-yearly output of these runs; jobs 3467004–3467007, gpushort, about 55 hours) and
+  `t512l24_10y_ric1_drag1e-4_dt112` (`Δt_at_T32 = Minute(30)`, 112.5 s, jobs 3467008–3467015, gpupreempt, about
+  63 hours). The time step of a run depends on its output interval (`adjust_with_output`): the "131 s" restart
+  tests ran with 127.8 s.
+  **PENDING: both, and the end of `t512l24_10y_ric1_cut1_drag1e-4`.**
+
+**Correction, 2026-11-24 13:15: the instability is in the vertical diffusion scheme at large diffusivity.**
+
+- The columns of the two Ri_c = 10 blow-ups of 2026-11-23 (5-minute snapshots in `output/blowup_head`) show the same
+  thing as the two above: 60–70 m/s in layers 19–24 and the zig-zag with a period of four time steps. One of
+  them, south of the Aleutians, is over open ocean (orography 3 m) with vertical Courant numbers of 0.01. So
+  neither the slope nor the vertical advection is needed.
+- One-day restarts of the two Ri_c = 1 events at the unchanged time step of 150 s, one change to the scheme each
+  (`output/blowup_ric1/run_br_antarctic_*`, `run_br_andes_*`; options `CONFIG=novdiff`, `MAX_K`, `MIXING_LENGTH`,
+  `FREE_MIXING_LENGTH`, `CONV_MIXING_LENGTH`, `RI_C` of `run_t512l24_restart_test.jl`):
+
+  | Change | Antarctic coast (default: blow-up 08:35) | Andes (default: blow-up 04:30) |
+  |---|---|---|
+  | scheme off (`vertical_diffusion = nothing`) | survives | survives |
+  | `max_diffusivity = 30` | survives | survives |
+  | `max_diffusivity = 100` | blow-up 10:05 | survives |
+  | `max_diffusivity = 300` | blow-up 08:55 | blow-up 05:10 |
+  | no local diffusivity (all three mixing lengths 0) | blow-up 08:45 | blow-up 05:25 |
+  | no boundary-layer profile (`critical_Richardson = 0.01`) | blow-up 04:05 | survives |
+
+  With `max_diffusivity = 30` the wind event itself is unchanged or stronger (hourly output: 63–69 m/s in layers
+  19–24 at the Andes column, 76–78 m/s at the Antarctic one) and the profiles stay smooth; without the scheme
+  the winds of these layers reach 80–100 m/s and there is no blow-up either. So the wind is not the cause, the
+  size of the diffusivity is, and either part of it (profile or local) can do it.
+- Reading: the solve is implicit in the diffused variable but the diffusivity is taken from the state before the
+  step ("explicit coefficient, implicit variable"). For a damping rate K ∝ Xᴾ around a forced equilibrium the
+  amplification of such a scheme in the stiff limit is (γ − 1 − P)/γ with the implicit weight γ (my
+  derivation; this class of schemes is analysed in Kalnay and Kanamitsu 1988, which I have not re-read): with
+  γ = 1 it is −P, an oscillation that changes sign every step of a leapfrog family, i.e.
+  with a period of four time steps, and that grows for P > 1. The growth of 1.4 per sign change seen here
+  corresponds to P ≈ 1.4; K ∝ u⋆ ∝ |V| alone gives P = 1. Known as fibrillations (Girard and Delage 1990, Bénard
+  et al. 2000); the usual remedy is an over-implicit weight γ > 1 (1.5 in the IFS, stable for P < 2γ − 1).
+- Test of that remedy in a scratch copy, not in the repository: worktree `$D/validation/tree_overimp` at
+  `8fd8d214f` with one option `implicitness` (γ) of the scheme; the solver is called with γΔt, so that its
+  tendency is the flux divergence of x⁻ + γΔt·y, and the model steps with Δt as before (two changed lines).
+  Same restarts, Δt = 150 s, `max_diffusivity = 1000`:
+
+  | γ | Antarctic coast | Andes |
+  |---|---|---|
+  | 1 (as in the repository) | blow-up 08:45 | blow-up 04:45 |
+  | 1.25 | survives | survives |
+  | 1.5 | survives | survives |
+  | 2 | survives | survives |
+
+- What other schemes use as a maximum diffusivity (source code read 2026-11-24): WRF YSU `xkzmax = 1000.`, NCEP
+  GFS hybrid EDMF `dkmax = 1000.`, the GFDL diffusivity module of the Frierson lineage (MITgcm port) no cap at
+  all. So the default of 1000 m²/s is the usual one and 30 is not a setting to propose. Their critical bulk
+  Richardson numbers: 0.25 (YSU stable, land), 0.15–0.35 (GFS), 1.0 (GFDL, stable and neutral), each with a
+  thermal excess or parcel method for the unstable boundary layer.
+- Runs started 13:10 on `tree_overimp` (`CODE=overimp`, option `IMPLICITNESS` of `run_t512l24_years.jl`), Δt =
+  150 s: `t512l24_10y_ric1_drag1e-4_overimp1.5` (Ri_c = 1, `drag = 1e-4`, γ = 1.5, 10 years, jobs 3469277–3469284,
+  gpupreempt) and `t512l24_acc_ric10_overimp1.5` (defaults of `8fd8d214f`, i.e. Ri_c = 10 and cutoff 10, with
+  γ = 1.5, 183 days, job 3469285; this configuration failed after 28, 60, 140 and with `max_diffusivity = 100`
+  146 days with γ = 1). **PENDING: the 10-year run.** A chain with `max_diffusivity = 30` was started 12:45 and
+  cancelled at 13:10 (superseded).
+- 14:20: **`t512l24_acc_ric10_overimp1.5` failed on day 60** (NaN at step 35101, 2000-03-01 22:30; the γ = 1 run
+  of the same configuration failed on the same date at 16:15, at another place, which I take for a coincidence
+  without having an explanation). So Ri_c = 10, cutoff 10, drag 1e-5 with γ = 1.5, the defaults of the working
+  tree, is not stable. What is known about this failure:
+  - No precursor in the 2-hourly records: 2 hours before, the highest wind of layers 19–24 is 62 m/s in a North
+    Pacific storm (49°N, 194°E, rising by 1 m/s per 2 hours) without a zig-zag anywhere (largest 2.8 K), and
+    114 m/s in layer 2 at 35°N, 95°E.
+  - It does not reproduce: the restart from 10.5 hours before with 5-minute records
+    (`output/blowup_ric10_overimp/run_bo_ric10_overimp1.5_0001`) survives the day. Location and kind of the
+    blow-up are therefore unknown; candidates are the top-layer jet with the weak drag 1e-5 (as in the first
+    10-year run) and a remaining instability of the scheme (with Ri_c = 10 the profile diffusivity grows like
+    u⋆h ∝ |V|², P = 2, the limit of γ = 1.5).
+  - The two reproducible blow-ups of the Ri_c = 10 runs of 2026-11-23 (southern Greenland, Aleutians; restart
+    files of `run_t512l24_10y_head_0001` and `..._head_drag1e-4_0001`, code `tree_overimp`): γ = 1 blows up at the
+    same times as on `a7d67a165` (16:10 and 01:10), γ = 1.5, 2 and 3 survive both.
+  - Three more 183-day runs of the Ri_c = 10 configuration, started 14:18 with a monitor record every 30
+    minutes: `t512l24_acc_ric10_g1.5_drag1e-4` (γ = 1.5, drag 1e-4, job 3473048), `..._g2_drag1e-4` (γ = 2, drag
+    1e-4, 3473049), `..._g2` (γ = 2, drag 1e-5, 3473050). Cancelled after 53 minutes (about day 60, none had
+    failed) and their output and logs deleted at 15:11 on the user's request, who decided for Ri_c = 1. So the
+    cause of the failure of `t512l24_acc_ric10_overimp1.5` stays unknown.
+- 15:20, user decision **Ri_c = 1**: `critical_Richardson = 1` is the default in the working tree, uncommitted,
+  together with `implicitness = 1.5` (revision log). The main suite passes with both (123208 of 123208,
+  `--check-bounds=yes`, Julia 1.12.2, log `$D/../tests/ric1_overimp_main_suite.log`). Enzyme, Reactant and GPU
+  suites not rerun. 10-year runs on a frozen copy of this state (`$D/validation/tree_wt1124` = `ddcfa4ac1` plus
+  the uncommitted source change `tree_wt1124_source.patch`, `CODE=wt1124`), started 15:12, Δt = 150 s, monitor
+  record every 30 minutes, gpupreempt:
+
+  | Run | γ | `SpeedLimitDrag` coefficient | Jobs |
+  |---|---|---|---|
+  | `t512l24_10y_wt_default` (defaults of the working tree) | 1.5 | 1e-5 | 3473631–3473638 |
+  | `t512l24_10y_wt_g2_drag1e-4` | 2 | 1e-4 | 3473639–3473646 |
+  | `t512l24_10y_wt_g2` | 2 | 1e-5 | 3473647–3473654 |
+  | `t512l24_10y_ric1_drag1e-4_overimp1.5` (started 13:10 on `tree_overimp`, `8fd8d214f`) | 1.5 | 1e-4 | 3469277–3469284 |
+
+  **PENDING: all four**, due 2026-11-26 around noon to 15:00. The chain with Δt = 112.5 s was cancelled at 15:12
+  to free a GPU; the one with 129.6 s and `t512l24_10y_ric1_cut1_drag1e-4` (γ = 1) continue.
+- 15:33, user: "We don't need to test weight = 2; but do include Ri_cutoff = 1 in the tests". The two γ = 2 chains
+  of the table above were cancelled after 20 minutes and their output deleted. New, same code and settings
+  (`CODE=wt1124`, γ = 1.5, Ri_c = 1, 150 s) with `Richardson_cutoff = 1` of the scheme (`RI_CUTOFF=1`; the
+  `Richardson_cutoff` of `BulkRichardsonDrag` is a separate option and stays 10): `t512l24_10y_wt_cut1` (drag 1e-5,
+  jobs 3473866–3473873) and `t512l24_10y_wt_cut1_drag1e-4` (drag 1e-4, jobs 3473874–3473881). The test matrix is
+  now cutoff 10 or 1 times drag 1e-5 or 1e-4, all with γ = 1.5: `wt_default`, `ric1_drag1e-4_overimp1.5`,
+  `wt_cut1`, `wt_cut1_drag1e-4`. **PENDING: all four.**
+- Literature values of such a cutoff (looked up 2026-11-24): turbulence ceases at a gradient or flux Richardson
+  number of about 0.2–0.25 (Grachev et al. 2013 from SHEBA; weak non-Kolmogorov turbulence beyond); Frierson et
+  al. 2006 use 1; the GFDL Monin–Obukhov module of that model lineage has `rich_crit = 2.0` as its default (must
+  be > 0.25; mixing zero at and above it, drag at its minimum of 1e-5 from 95 % of it; read from the MITgcm port);
+  long-tail functions (Louis et al. 1982, as in the local diffusivity here) have none. The two chains with the shorter time step continue as a fallback that needs no code change.
+- 13:35, user request: the over-implicit weight is now in the working tree of the repository, uncommitted, as
+  the option `implicitness` with the default 1.5 (revision log, 2026-11-24), with two tests and the documentation.
+  `test/parameterizations/vertical_diffusion.jl` passes with `--check-bounds=yes` (170 tests), and so does the
+  main suite with the new default (`Pkg.test("SpeedyWeather")` with `--check-bounds=yes`, Julia 1.12.2: 123208 of
+  123208 pass, 13:54, log `$D/../tests/overimp_main_suite.log`). Not run with it:
+  Enzyme, Reactant and GPU suites. Not done: a comparison of the mean climate with γ = 1 and 1.5.
 
 ### 8.11 Scheme as the default (step 8) and the state of the tests
 

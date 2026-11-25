@@ -184,10 +184,11 @@ see [Bulk Richardson-based drag coefficient](@ref). The stability correction in 
 bulk Richardson number ``Ri_a`` between the surface and the lowermost layer (computed as for the drag,
 from the soil and sea surface temperatures, weighted with the land fraction)
 clamped to ``0 \leq Ri_a \leq Ri_{cut}``, so that it is 1 for unstable and neutral conditions and 0
-for ``Ri_a \geq Ri_{cut}``. Frierson et al. (2006) use ``Ri_c`` here. We use a separate cutoff
-``Ri_{cut} = 10`` (option `Richardson_cutoff`), as for the drag, so that the profile only vanishes
-where buoyancy dominates the shear by an order of magnitude. ``Ri_c`` keeps its conventional meaning as
-the threshold that defines the boundary layer height. ``z_0`` is the roughness length for momentum.
+for ``Ri_a \geq Ri_{cut}``. Frierson et al. (2006) use ``Ri_c`` here. The cutoff is a separate option
+`Richardson_cutoff` with the same default ``Ri_{cut} = 1``, so that ``Ri_c`` keeps its conventional
+meaning as the threshold that defines the boundary layer height. The drag coefficient has its own
+cutoff with a default of 10, see [Bulk Richardson-based drag coefficient](@ref).
+``z_0`` is the roughness length for momentum.
 
 ### Local diffusivity
 
