@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `set!` and the initial conditions remove the extra degree lmax+1 from spectral prognostic variables, opt out with `set!(...; truncate = false)`; `truncate_extra_degree!` (LowerTriangularArrays v1.1.0) replaces `zero_last_degree!` [#1440](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1440)
 - Splits Reactant tests into unit tests and correctness tests [#1443](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1443)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)

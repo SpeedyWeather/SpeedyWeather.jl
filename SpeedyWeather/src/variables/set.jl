@@ -25,6 +25,13 @@ Specify the namespace as a symbol in case the `vars::NamedTuple` contains them, 
    
 The keyword argument `step` specifies the step index to set, default is 1.
 For variables without a step dimension use `step = nothing` to skip the `get_step`.
+
+With `truncate = true` (default) spectral variables are truncated after they are set, removing the
+extra degree ``l_{max}+1`` that all spectral variables carry but only vector quantities use
+(see [`truncate_extra_degree!`](@ref)). All prognostic variables are scalars, so this degree is
+otherwise filled by the transform from grid space (or by copying from a larger spectral field)
+but never changed by the time stepping. Use `truncate = false` to set spectral vector quantities,
+e.g. the spectral `u_tendency` in `group = :dynamics`.
 """
 function set!(
         vars::NamedTuple,
@@ -36,15 +43,19 @@ function set!(
         static_func::Bool = true,
         namespace::Union{Nothing, Symbol} = nothing,
         scratch_field::Union{Nothing, AbstractField} = nothing,
+        truncate::Bool = true,
         kwargs...
     )
     # special case for u,v setting vor, div
     if :u in keys(kwargs) && :v in keys(kwargs)
-        (; vorticity, divergence) = vars
+        vor = get_step(vars.vorticity, step)
+        div = get_step(vars.divergence, step)
         set_vordiv!(
-            get_step(vorticity, step), get_step(divergence, step), kwargs[:u], kwargs[:v],
+            vor, div, kwargs[:u], kwargs[:v],
             geometry, spectral_transform; add, coslat_scaling_included, static_func
         )
+        truncate && truncate_extra_degree!(vor)
+        truncate && truncate_extra_degree!(div)
     elseif :u in keys(kwargs) || :v in keys(kwargs)
         @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
     end
@@ -56,11 +67,13 @@ function set!(
         elseif varname in keys(vars)
             var = ArrayDimensions.hastime(vars[varname]) ? get_step(vars[varname], step) : vars[varname]
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func, scratch_field)
+            truncate && truncate_extra_degree!(var)
         elseif namespace in keys(vars)
             if varname in keys(vars[namespace])
                 var = ArrayDimensions.hastime(vars[namespace][varname]) ?
                     get_step(vars[namespace][varname], step) : vars[namespace][varname]
                 set!(var, kwargs[varname], geometry, spectral_transform; add, static_func, scratch_field)
+                truncate && truncate_extra_degree!(var)
             else
                 # throw error if varname can't be found and print existing variables
                 @warn "`$varname` not defined in NamedTuple with keys = $(keys(vars[namespace])). Skipping."
@@ -323,7 +336,8 @@ function set!(
     return var .= kernel.(var, s)
 end
 
-# set vor_div <- func
+# set vor_div <- func, evaluated on the grid to avoid a spectral round trip of u, v before
+# the 1/coslat scaling (which can only be applied in grid space)
 function set_vordiv!(
         vor::LowerTriangularArray,
         div::LowerTriangularArray,
@@ -335,12 +349,13 @@ function set_vordiv!(
         coslat_scaling_included::Bool = false,
         kwargs...,
     )
-    u_L = similar(vor)
-    set!(u_L, u_func, geometry, S; kwargs...)
-    v_L = similar(vor)
-    set!(v_L, v_func, geometry, S; kwargs...)
+    (; grid, NF) = geometry.spectral_grid
+    u = ndims(vor) == 1 ? zeros(NF, grid) : zeros(NF, grid, size(vor, 2))
+    v = similar(u)
+    set!(u, u_func, geometry, S; kwargs...)
+    set!(v, v_func, geometry, S; kwargs...)
 
-    return set_vordiv!(vor, div, u_L, v_L, geometry, S; add, coslat_scaling_included, kwargs...)
+    return set_vordiv!(vor, div, u, v, geometry, S; add, coslat_scaling_included)
 end
 
 # set vor_div <- grid
@@ -350,11 +365,12 @@ function set_vordiv!(
         u::AbstractField,
         v::AbstractField,
         geometry::Geometry,
-        S::AbstractSpectralTransform = SpectralTransform(geometry.spectral_grid);
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
     )
+    S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
     u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
     v_ = coslat_scaling_included ? v : RingGrids.scale_coslat⁻¹(v)
 
@@ -375,27 +391,31 @@ function set_vordiv!(
         u::LowerTriangularArray,
         v::LowerTriangularArray,
         geometry::Geometry,
-        S::AbstractSpectralTransform = SpectralTransform(geometry.spectral_grid);
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
     )
-    u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
-    v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
+    S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
+
+    # first bring u, v to the size of vor, div (and S), copyto! copies the largest matching
+    # subset of harmonics, i.e. truncates larger or zero-pads smaller u, v
+    u_ = size(u) == size(vor) ? u : copyto!(zero(vor), u)
+    v_ = size(v) == size(vor) ? v : copyto!(zero(vor), v)
+
+    # the 1/coslat scaling can only be applied in grid space
+    if !coslat_scaling_included
+        u_ = transform(RingGrids.scale_coslat⁻¹(transform(u_, S)), S)
+        v_ = transform(RingGrids.scale_coslat⁻¹(transform(v_, S)), S)
+    end
+
     radius = geometry.radius[]
-
-    if size(vor) != size(u_) != size(v_)
-        u_new = zero(vor)
-        copyto!(u_new, u_)
-
-        v_new = zero(vor)
-        copyto!(v_new, v_)
-
-        curl!(vor, u_new, v_new, S; add, radius)
-        divergence!(div, u_new, v_new, S; add, radius)
+    if add  # not curl!(...; add, radius) as that also divides the existing vor, div by the radius
+        vor .+= SpeedyTransforms.curl(u_, v_, S; radius)
+        div .+= SpeedyTransforms.divergence(u_, v_, S; radius)
     else
-        curl!(vor, u_, v_, S; add, radius)
-        divergence!(div, u_, v_, S; add, radius)
+        curl!(vor, u_, v_, S; radius)
+        divergence!(div, u_, v_, S; radius)
     end
     return vor, div
 end
@@ -408,8 +428,10 @@ function set_vordiv!(
         v::Number,  # this is a constant field, curl and div are zero
         geometry::Geometry,
         S::Union{Nothing, SpectralTransform} = nothing;
+        add::Bool = false,
         kwargs...
     )
+    add && return vor, div      # adding zero vorticity and divergence changes nothing
     vor .= 0    # curl of a constant is zero
     div .= 0    # divergence of a constant is zero
     return vor, div
