@@ -11,7 +11,7 @@ function ZarrOutput(
         SG::SpectralGrid,
         Model::Type{<:AbstractModel} = Barotropic;
         nlayers_soil = DEFAULT_NLAYERS_SOIL,
-        output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half, SpeedyWeather.output_architecture(SG.architecture)),
+        output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half, SG.architecture),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         compressor = nothing,
@@ -19,10 +19,9 @@ function ZarrOutput(
         kwargs...
     )
 
-    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
-    arch = SpeedyWeather.output_architecture(SG.architecture)
-    output_grid = on_architecture(arch, output_grid)
-    input_grid = on_architecture(arch, SG.grid)
+    # OUTPUT GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    output_grid = on_architecture(SG.architecture, output_grid)
+    input_grid = SG.grid
 
     # CREATE INTERPOLATOR, with pole-average buffers for the most layers any output field has
     nlayers = max(SpeedyWeather.get_nlayers(layers, SG), nlayers_soil)
@@ -145,10 +144,7 @@ function initialize!(
         # (and clearly) otherwise instead of writing into wrong time/ensemble slots
         validate_ensemble_store(g, output, n_outputs, simulation)
 
-        for (key, var) in output.variables
-            exists_in_simulation(var, simulation) || continue
-            output!(output, var, simulation)
-        end
+        output!(output, output.variables, simulation)   # write this member's initial conditions
         return nothing
     end
 
@@ -176,17 +172,18 @@ function initialize!(
     create_time_axis!(g, output, n_outputs)
     output!(output, vars.prognostic.clock.time)   # write initial time
 
-    # VARIABLES: define every output variable in the Zarr store and write initial
-    # conditions, skipping any that don't exist in the simulation — the same check the
-    # generic `output!` makes at write time, applied here so a skipped variable doesn't
-    # leave an all-fill_value phantom array behind
+    # VARIABLES: define every output variable in the Zarr store, skipping any that don't
+    # exist in the simulation — the same check the generic `output!` makes at write time,
+    # applied here so a skipped variable doesn't leave an all-fill_value phantom array behind
     simulation = Simulation(vars, model)
     warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
         exists_in_simulation(var, simulation) || continue
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
-        output!(output, var, simulation)
     end
+
+    # write the initial conditions of all variables at once (one compiled program with Reactant)
+    output!(output, output.variables, simulation)
 
     # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
     # the schema is complete at this point and all later writes (any ensemble member,

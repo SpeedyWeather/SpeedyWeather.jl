@@ -66,7 +66,9 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
         version = land.version
     )
 
-    lst = on_architecture(model.architecture, lst)
+    # in the model's precision to interpolate in it, not in that of the file (Float32), see EarthOrography
+    NF = eltype(monthly_temperature)
+    lst = on_architecture(model.architecture, Field(convert.(NF, lst.data), lst.grid, lst.dims))
 
     @boundscheck fields_match(monthly_temperature, lst, vertical_only = true) ||
         throw(DimensionMismatch(monthly_temperature, lst))
