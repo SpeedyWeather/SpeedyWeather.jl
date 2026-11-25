@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Splits Reactant tests into unit tests and correctness tests [#1443](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1443)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Interpolation (of initial conditions/boundary conditions) always in model precision; Reactant tests revised [#1438](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1438)
