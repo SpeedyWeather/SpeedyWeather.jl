@@ -57,6 +57,36 @@ $(TYPEDSIGNATURES)
 Triangular truncation of `alms` to the size of it, sets additional rows to zero."""
 truncate!(alms::LowerTriangularArray) = truncate!(alms, size(alms, 2, OneBased, as = Matrix))
 
+"""$(TYPEDSIGNATURES)
+Set the extra degree of `L` to zero, i.e. all harmonics with a degree ``l`` larger than the
+truncation (``l > m_{max}``, 1-based), a no-op for square `LowerTriangularArray`s.
+Spectral variables in SpeedyWeather carry one more degree ``l_{max} = m_{max}+1`` as vector
+quantities (e.g. ``u, v`` or gradients) need it for the meridional derivative. Scalar quantities
+must not use it. Same as `truncate!(L)` but branch-free (for Reactant): the kernel reads and
+writes all elements, not just those of the extra degree."""
+function truncate_extra_degree!(L::LowerTriangularArray)
+    (; mmax, l_indices) = L.spectrum
+    launch!(
+        architecture(L), SpectralWorkOrder, size(L),
+        truncate_extra_degree_kernel!, L, l_indices, mmax
+    )
+    return L
+end
+
+"""$(TYPEDSIGNATURES)
+Apply `truncate_extra_degree!` to all elements of `vars`, recursing into nested `NamedTuple`s
+(e.g. namespaces like `vars.prognostic.tracers`). Non-spectral elements are left untouched."""
+truncate_extra_degree!(vars::NamedTuple) = (foreach(truncate_extra_degree!, values(vars)); vars)
+
+"""$(TYPEDSIGNATURES)
+No-op fallback for non-spectral `x` (e.g. grid variables or the clock), returns `x`."""
+truncate_extra_degree!(x) = x
+
+@kernel inbounds = true function truncate_extra_degree_kernel!(data, l_indices, mmax)
+    I = @index(Global, Cartesian)
+    l = l_indices[I[1]]
+    data[I] = ifelse(l > mmax, zero(eltype(data)), data[I])
+end
 
 """
 $(TYPEDSIGNATURES)

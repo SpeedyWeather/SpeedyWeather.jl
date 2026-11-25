@@ -66,6 +66,13 @@ end
 For reference, [MurphyKoop2005](@citet) give 19.0 (12.8 over ice), 125.6 (103.2 over ice),
 611.2, 2339 and 7385 Pa at these temperatures.
 
+Here is an overview of the accuracy of each formulation against [MurphyKoop2005](@citet) quantified as relative error.
+The IFS formulation considers a mixed phase between -23˚ and 0˚C which we therefore also apply to the the 
+[MurphyKoop2005](@citet) reference and other formulations too to compare on a single axis from -100˚ to +100˚
+covering both vapor saturation over ice and liquid water.
+
+<img width="2000" height="1040" alt="image" src="https://github.com/user-attachments/assets/dcfe9a46-0708-484f-bc52-a9e9724624da" />
+
 ## User interface
 
 The default is `IFSMixedPhase`, as it is the only formulation with an ice phase and accurate to

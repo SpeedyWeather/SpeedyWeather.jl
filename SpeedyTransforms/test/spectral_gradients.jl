@@ -7,7 +7,7 @@
             S = SpectralTransform(spectrum, grid; NF, nlayers)
 
             vor = randn(complex(NF), spectrum, nlayers)
-            # LowerTriangularArrays.zero_last_degree!(vor)   # not needed
+            # truncate_extra_degree!(vor)   # not needed
 
             div = zeros(complex(NF), spectrum, nlayers)
             U = zero(div)
@@ -60,7 +60,7 @@ end
             S = SpectralTransform(spectrum, grid; NF, nlayers)
 
             div = randn(complex(NF), spectrum, nlayers)
-            # LowerTriangularArrays.zero_last_degree!(div)   # not needed
+            # truncate_extra_degree!(div)   # not needed
             vor = zeros(complex(NF), spectrum, nlayers)
 
             U = zero(div)
@@ -210,8 +210,8 @@ end
             vor = randn(complex(NF), spectrum, nlayers)
             div = randn(complex(NF), spectrum, nlayers)
 
-            zero_last_degree!(vor)   # needed?
-            zero_last_degree!(div)   # needed?
+            truncate_extra_degree!(vor)   # needed?
+            truncate_extra_degree!(div)   # needed?
 
             # zero mean on every layer
             vor[1, :] .= 0

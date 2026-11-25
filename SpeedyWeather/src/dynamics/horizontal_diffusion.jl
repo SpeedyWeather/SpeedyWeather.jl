@@ -303,7 +303,7 @@ function horizontal_diffusion!(
     # all our prognostic variables are, so set to zero now for those variables that
     # aren't subject to diffusion
     η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, diffusion)
-    zero_last_degree!(η_tend)
+    truncate_extra_degree!(η_tend)
 
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
@@ -344,7 +344,7 @@ function horizontal_diffusion!(
     # all our prognostic variables are, so set to zero now for those variables that
     # aren't subject to diffusion
     pres_tend = get_tendency_step(vars.tendencies.pressure, model.time_stepping, diffusion)
-    zero_last_degree!(pres_tend)
+    truncate_extra_degree!(pres_tend)
 
     set_scalar!(pres_tend.data, 1, 0)    # mass conservation
 
