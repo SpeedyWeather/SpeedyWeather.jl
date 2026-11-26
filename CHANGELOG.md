@@ -3,6 +3,8 @@
 ## Unreleased
 
 - `DiagnosticClouds(humidity_smoothing = HumiditySmoothing(spectral_grid, thickness = 1/8))` averages relative humidity over a fixed σ window before taking its free-tropospheric maximum, so that cloud cover does not increase with the number of layers (default `NoHumiditySmoothing()`, unchanged) [#1435](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1435)
+- Terrarium land: one Terrarium step per SpeedyWeather step by default (`Δt = nothing`) so both clocks stay in sync, also over the Leapfrog half steps; a given `Δt` is a maximum sub-step, each step is split into equal sub-steps; fixes test compatibility with Terrarium v0.2 [#1390](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1390)
+- Fix the differentiability of the Terrarium land coupling: coupler-defined Terrarium `Field`s (e.g. the top-layer soil porosity) are built once at allocation instead of in `timestep!`, plus Enzyme tests for the coupled model [#1405](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1405)
 - `set!` and the initial conditions remove the extra degree lmax+1 from spectral prognostic variables, opt out with `set!(...; truncate = false)`; `truncate_extra_degree!` (LowerTriangularArrays v1.1.0) replaces `zero_last_degree!` [#1440](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1440)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
