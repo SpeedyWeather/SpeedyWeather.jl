@@ -388,6 +388,12 @@ of `scheme`, which is linearly stable up to a Courant number of about 1.43 for W
 take a single substep (3 evaluations of the column operator instead of 1), so the cost depends on the flow. With
 `courant_target = nothing` every column takes exactly `substeps` substeps instead, which makes the cost independent of the flow.
 
+On CPU a call costs 3-4 times that of `WENOVerticalAdvection` (16-28 % of a time step at T31-T127, L8-L100).
+On GPU it is parallel over columns only, so columns that need many substeps hold back the others in their warp:
+at T127 L100 after a 12-hour spin-up (maximum Courant number 6) it costs 14 times `WENOVerticalAdvection`
+(42 % of a time step on an A100), 4 times with a fixed single substep. Use it when the vertical Courant number
+exceeds about 1.4, i.e. with many thin layers; with few layers `WENOVerticalAdvection` is cheaper.
+
 Like the other diffusive schemes, it advects the variables of the previous time step over the whole leapfrog interval
 ``2\Delta t`` and adds the mean tendency, so the vertical advection is effectively operator-split from the other tendencies.
 

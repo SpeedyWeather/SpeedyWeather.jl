@@ -1,6 +1,6 @@
 # SubcycledVerticalAdvection: Courant-adaptive vertical advection for many layers
 
-> Status: **in progress**. Scheme, tests and docs revised after review; the cost benchmark is pending.
+> Status: **in progress**. Revised after review and benchmarked; GPU efficiency of the adaptive mode is the main open point.
 
 Date of initial draft: 2026-11-26
 
@@ -67,8 +67,33 @@ upwind-3 and WENO5, also with the time step halved to 150 s.
   within 1 % and the bump moves by the right distance (WENO and upwind-3 stage operators), fixed
   10 substeps equal adaptive ceil(9.5) = 10 substeps, interval taken from the time stepper.
 - Used in all our L100 runs from T31 to T512 (A100), including 90 days at T512 L100, all stable.
-- Pending: cost relative to `WENOVerticalAdvection` (T31/T127 × L8/L100, CPU and GPU) with the
-  distribution of substeps.
+- Cost: `SpeedyWeather/benchmark/subcycled_vertical_advection.jl`. `PrimitiveWetModel` with default
+  physics, 12-hour spin-up with the subcycled scheme, then each scheme timed on the same state
+  (ms per `vertical_advection!` call for u, v, T, q). "step" is a full time step with the adaptive scheme.
+
+  CPU (Apple M2, 4 threads):
+
+  | T | L | WENO | adaptive | n = 1 | n = 4 | columns n = 1 | max n | max C | step | adaptive / step |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | 31 | 8 | 0.58 | 2.28 | 2.29 | 8.6 | 100 % | 1 | 0.14 | 14.2 | 16 % |
+  | 31 | 100 | 8.5 | 28.1 | 24.9 | 97.0 | 99.4 % | 2 | 1.73 | 102 | 28 % |
+  | 127 | 8 | 6.6 | 22.7 | 22.7 | 86.3 | 100 % | 1 | 0.14 | 145 | 16 % |
+  | 127 | 100 | 95.0 | 301.5 | 283.3 | 1056 | 98.4 % | 7 | 6.08 | 1498 | 20 % |
+
+  GPU (A100-SXM4-40GB):
+
+  | T | L | WENO | adaptive | n = 1 | n = 4 | step | adaptive / step |
+  |---|---|---|---|---|---|---|---|
+  | 31 | 8 | 0.28 | 0.28 | 0.26 | 0.93 | 1.4 | 19 % |
+  | 31 | 100 | 0.09 | 4.44 | 2.57 | 9.70 | 23.4 | 19 % |
+  | 127 | 8 | 0.13 | 0.37 | 0.36 | 1.29 | 7.4 | 5 % |
+  | 127 | 100 | 1.25 | 17.8 | 5.26 | 18.2 | 42.0 | 42 % |
+
+  On CPU the cost is 3-4× WENO, as expected from 3 stages, and the adaptive mode costs about the same
+  as n = 1 because 98-100 % of the columns take one substep. On GPU the adaptive mode at T127 L100
+  costs as much as 4 substeps everywhere: the few columns with up to 7 substeps hold back their warps.
+  At T31 L100 (~4.6k columns) the column-parallel kernel under-occupies the GPU, while WENO is
+  parallel over columns × layers.
 
 ## Documentation changes
 
@@ -83,6 +108,10 @@ upwind-3 and WENO5, also with the time step halved to 150 s.
   the fixed mode there.
 
 ## Future work
+
+- GPU efficiency: one workgroup per column with the layers as work items and the column in local
+  memory (`@localmem`, `@synchronize` between stages). Divergence would then only be between
+  workgroups, and occupancy would match WENO. Alternatively sort or bin columns by `n`.
 
 - Output the number of substeps (maximum over columns) as a diagnostic.
 - With the Lorenz N-cycle time stepping for `PrimitiveWet`, revisit whether subcycling is still needed.
