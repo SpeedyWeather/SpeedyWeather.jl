@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `BettsMillerConvection(spectral_grid; resolution_scaling)` option to shorten the relaxation time with resolution, `time_scale × (32/truncation)^resolution_scaling`, default 0 (unchanged) [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
 - `set!` and the initial conditions remove the extra degree lmax+1 from spectral prognostic variables, opt out with `set!(...; truncate = false)`; `truncate_extra_degree!` (LowerTriangularArrays v1.1.0) replaces `zero_last_degree!` [#1440](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1440)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
