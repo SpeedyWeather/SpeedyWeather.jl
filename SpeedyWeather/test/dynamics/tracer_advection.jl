@@ -61,10 +61,11 @@ end
     abc0 = deepcopy(simulation.variables.grid.tracers.abc)
 
     # set some grid in the same way and check that the tracer abc is correctly set
-    # but compare in spectral space due to transform errors
+    # but compare in spectral space due to transform errors, set! removes the extra degree
     def = zero(get_step(abc0, 1))
     set!(def, f, model.geometry)
-    @test abc0_spec == transform(def, model.spectral_transform)
+    def_spec = SpeedyTransforms.spectral_truncation!(transform(def, model.spectral_transform))
+    @test abc0_spec == def_spec
 
     # check that everything is different after 10 days
     run!(simulation, period = Day(10))

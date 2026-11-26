@@ -171,10 +171,10 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
         version = vegetation.version
     )
 
-    vegh = on_architecture(model.architecture, vegh)
-    vegl = on_architecture(model.architecture, vegl)
-    lai_hv = on_architecture(model.architecture, lai_hv)
-    lai_lv = on_architecture(model.architecture, lai_lv)
+    # in the model's precision to interpolate in it, not in that of the file (Float32), see EarthOrography
+    NF = eltype(vegetation.high_vegetation_cover)
+    to_model(field) = on_architecture(model.architecture, Field(convert.(NF, field.data), field.grid, field.dims))
+    vegh, vegl, lai_hv, lai_lv = to_model(vegh), to_model(vegl), to_model(lai_hv), to_model(lai_lv)
     high_lai = vegetation.high_vegetation_leaf_area
     low_lai = vegetation.low_vegetation_leaf_area
 
