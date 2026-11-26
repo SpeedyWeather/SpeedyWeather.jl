@@ -54,7 +54,8 @@ end
     land_sea_mask = EarthLandSeaMask(spectral_grid)
     SpeedyWeather.load_mask!(land_sea_mask)
 
-    model = build_terrarium_wet_model(ring_grid, land_sea_mask, land_sea_mask.land_fraction .> 0)
+    # a maximum sub-step that divides neither the SpeedyWeather step nor the Leapfrog half steps
+    model = build_terrarium_wet_model(ring_grid, land_sea_mask, land_sea_mask.land_fraction .> 0; Δt = Second(421))
     @test model.land isa AbstractTerrariumLandModel
     @test model.land isa SpeedyWeather.AbstractLand
     @test SpeedyWeather.get_nlayers(model.land) == 1
@@ -69,6 +70,10 @@ end
 
     # Run a handful of steps and confirm nothing has gone NaN.
     SpeedyWeather.run!(sim, steps = 3)
+
+    # Terrarium sub-steps each SpeedyWeather step and both clocks stay in sync
+    @test sim.variables.prognostic.land.terrarium.clock.iteration > 3
+    @test sim.variables.prognostic.land.terrarium.clock.time == sim.variables.prognostic.clock.time
 
     @test all(isfinite, sim.variables.prognostic.land.soil_temperature)
     @test all(isfinite, sim.variables.prognostic.land.soil_moisture)
@@ -119,6 +124,13 @@ end
     @test adapted.prognostic.land.soil_temperature == sim.variables.prognostic.land.soil_temperature
     @test adapted.grid.temperature == sim.variables.grid.temperature
     @test sim.variables.prognostic.land.terrarium isa Terrarium.StateVariables
+
+    # a maximum sub-step `Δt` splits each SpeedyWeather step into the fewest equal sub-steps not longer than `Δt`
+    @test SWTerrarium.terrarium_substeps(nothing, Millisecond(Minute(20))) == 1
+    @test SWTerrarium.terrarium_substeps(Minute(10), Millisecond(Minute(20))) == 2
+    @test SWTerrarium.terrarium_substeps(Minute(7), Millisecond(Minute(20))) == 3
+    @test SWTerrarium.terrarium_substeps(600.0f0, Millisecond(Minute(15))) == 2
+    @test_throws ArgumentError build_terrarium_wet_model(ring_grid, land_sea_mask, land_sea_mask.land_fraction .> 0; Δt = 0.0)
 end
 
 @testset "Terrarium coupling (dry): initialize + run + NaN check" begin
@@ -147,7 +159,7 @@ end
         spectral_grid, soil_model;
         inputs = Tair_input,
         boundary_conditions = bcs,
-        Δt = 300.0,
+        Δt = 421.0,     # maximum sub-step (seconds) that divides neither the step nor the Leapfrog half steps
     )
     @test land isa AbstractTerrariumLandModel
     @test land isa SpeedyWeather.AbstractLand
@@ -170,6 +182,8 @@ end
 
     SpeedyWeather.run!(sim, steps = 3)
 
+    @test sim.variables.prognostic.land.terrarium.clock.iteration > 3
+    @test sim.variables.prognostic.land.terrarium.clock.time == sim.variables.prognostic.clock.time
     @test all(isfinite, sim.variables.prognostic.land.soil_temperature)
     @test all(isfinite, sim.variables.grid.temperature)
     @test all(isfinite, sim.variables.grid.pressure)
