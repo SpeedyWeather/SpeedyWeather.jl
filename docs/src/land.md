@@ -385,7 +385,7 @@ terrarium_model = Terrarium.LandModel(
     soil,
 )
 
-# Wrap as a SpeedyWeather land component (time step Δt = 300 s)
+# Wrap as a SpeedyWeather land component (Terrarium sub-steps with maximum timestep Δt = 300 s)
 land = SpeedyWeather.LandModel(spectral_grid, terrarium_model; Δt = 300.0)
 
 # Assemble the wet primitive model around `land`
