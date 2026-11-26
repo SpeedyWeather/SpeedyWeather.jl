@@ -279,8 +279,10 @@ export SlabOcean
 Tendencies are from net surface radiation and surface latent and sensible heat fluxes.
 The effective mixed-layer heat capacity is `specific_heat_capacity * mixed_layer_depth * density`.
 Initialised from seasonal SST climatology, with land points set to `land_temperature`.
+Optionally horizontal heat transport within the mixed layer can be added with the `heat_transport`
+component, e.g. [`OceanHeatDiffusion`](@ref), by default there is none ([`NoOceanHeatTransport`](@ref)).
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractDynamicOcean
+@parameterized @kwdef mutable struct SlabOcean{NF, HeatTransport <: AbstractOceanHeatTransport} <: AbstractDynamicOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
@@ -296,14 +298,18 @@ Fields are $(TYPEDFIELDS)"""
     "[OPTION] SST over land [K]"
     land_temperature::NF = 285
 
+    "[OPTION] Horizontal heat transport in the mixed layer"
+    @component heat_transport::HeatTransport = NoOceanHeatTransport()
+
     "[DERIVED] Effective mixed-layer heat capacity [J/K/m²]"
     heat_capacity_mixed_layer::NF = specific_heat_capacity * mixed_layer_depth * density
 end
 
 # generator function
-SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
+SlabOcean(SG::SpectralGrid; heat_transport = NoOceanHeatTransport(), kwargs...) =
+    SlabOcean{SG.NF, typeof(heat_transport)}(; heat_transport, kwargs...)
 
-function variables(::SlabOcean, model::AbstractModel)
+function variables(ocean_model::SlabOcean, model::AbstractModel)
     nsteps = get_nsteps(model.time_stepping, :ocean)
     pg = nsteps.prognostic
     tg = nsteps.tendency
@@ -318,11 +324,18 @@ function variables(::SlabOcean, model::AbstractModel)
 
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m^2", namespace = :ocean),
         ParameterizationVariable(:surface_sensible_heat_flux, Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
+        variables(ocean_model.heat_transport, model)...,
     )
 end
 
-# nothing to initialize for SlabOcean model itself
-initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
+# the heat transport stencil depends on the land-sea mask and the time step, rebuild it when they change
+# with set!, but only if already initialized (otherwise initialize! builds it)
+land_sea_mask_or_time_step_changed!(ocean_model::AbstractOcean, model::AbstractModel) = nothing
+land_sea_mask_or_time_step_changed!(ocean_model::SlabOcean, model::AbstractModel) =
+    heat_transport_changed!(ocean_model.heat_transport, ocean_model, model)
+
+# only the heat transport has to be initialized for the SlabOcean itself
+initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = initialize!(ocean_model.heat_transport, ocean_model, model)
 
 # set initial conditions from seasonal climatology, then fill land points
 function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
@@ -374,6 +387,7 @@ function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEqua
         architecture(dsst), LinearWorkOrder, size(dsst), slab_ocean_kernel!,
         dsst, land_fraction, Rsd, Rsu, Rld, Rlu, H, S, params
     )
+    heat_transport!(dsst, vars, ocean_model.heat_transport, ocean_model, model)     # no-op by default
     return nothing
 end
 

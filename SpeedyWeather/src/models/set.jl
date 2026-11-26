@@ -21,5 +21,10 @@ function set!(
     # time step, using the model's exact resolution factor so that a later initialize!(model)
     # (which recalculates Δt from Δt_at_T31) reproduces the requested time step
     isnothing(Δt) || set!(model.time_stepping, Δt, model)
+
+    # components precomputed from the land-sea mask or the time step
+    if !isnothing(land_sea_mask) || !isnothing(Δt)
+        hasproperty(model, :ocean) && land_sea_mask_or_time_step_changed!(model.ocean, model)
+    end
     return nothing
 end

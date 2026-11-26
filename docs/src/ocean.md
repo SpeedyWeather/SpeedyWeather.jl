@@ -124,6 +124,29 @@ converted to ``W/m^2`` through multiplication with the latent heat of condensati
 through turbulent transport of heat in the atmospheric boundary layer. All surface flux
 terms have units of ``W/m^2``.
 
+### Ocean heat transport
+
+By default the slab ocean has no horizontal heat transport. Optionally the mixed layer
+temperature is diffused horizontally, a simple parameterization of the heat transport by
+eddies and currents that moves heat from the tropics towards the poles
+
+```julia
+ocean = SlabOcean(spectral_grid, heat_transport = OceanHeatDiffusion(spectral_grid))
+```
+
+`OceanHeatDiffusion` is a conservative finite-volume discretization on ring grids that is
+precomputed at `initialize!` and rebuilt by `set!(model; land_sea_mask)` or `set!(model; Δt)`. Heat, not temperature, is conserved,
+and there is no flux through coastlines: every face between two cells is weighted by the smaller of their
+ocean fractions. The transport continues under sea ice, but there the coupled system does not conserve heat:
+[`ThermodynamicSeaIce`](@ref) has no energy budget, so heat converging under the ice melts it and
+heat diverging grows it while the sea surface temperature is held at freezing. Between rings the temperature
+is interpolated in longitude to the segments of the shared face, which keeps the discretization of the Laplacian
+accurate for fields that vary with longitude. The flux is ``\rho c\, K \nabla T`` with the depth-integrated
+diffusivity `diffusivity_depth` ``K = D H`` [m³/s] (default 1.25e6, which is Codron's, 2012, 25000 m²/s for a 50 m layer)
+so that the transport does not depend on the mixed-layer depth ``H`` and the diffusivity is ``D = K/H``. Alternatively
+set `diffusivity` [m²/s] directly. The scheme is explicit in time, `initialize!` chooses the number of substeps per ocean time step
+such that the stability number is below 0.5 (`substeps`), which matters for shallow oceans where ``D`` is large.
+
 Depending on the presence of sea ice, the sensible and latent heat fluxes are subject to
 insulation, see [Thermodynamic sea ice model](@ref). The insulation is applied as a flux reduction
 within the surface flux calculation. The slab ocean is then passed on to the model constructor
