@@ -309,7 +309,7 @@ end
 SlabOcean(SG::SpectralGrid; heat_transport = NoOceanHeatTransport(), kwargs...) =
     SlabOcean{SG.NF, typeof(heat_transport)}(; heat_transport, kwargs...)
 
-function variables(::SlabOcean, model::AbstractModel)
+function variables(ocean_model::SlabOcean, model::AbstractModel)
     nsteps = get_nsteps(model.time_stepping, :ocean)
     pg = nsteps.prognostic
     tg = nsteps.tendency
@@ -324,8 +324,15 @@ function variables(::SlabOcean, model::AbstractModel)
 
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m^2", namespace = :ocean),
         ParameterizationVariable(:surface_sensible_heat_flux, Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
+        variables(ocean_model.heat_transport, model)...,
     )
 end
+
+# the heat transport stencil depends on the land-sea mask and the time step, rebuild it when they change
+# with set!, but only if already initialized (otherwise initialize! builds it)
+land_sea_mask_or_time_step_changed!(ocean_model::AbstractOcean, model::AbstractModel) = nothing
+land_sea_mask_or_time_step_changed!(ocean_model::SlabOcean, model::AbstractModel) =
+    heat_transport_changed!(ocean_model.heat_transport, ocean_model, model)
 
 # only the heat transport has to be initialized for the SlabOcean itself
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = initialize!(ocean_model.heat_transport, ocean_model, model)

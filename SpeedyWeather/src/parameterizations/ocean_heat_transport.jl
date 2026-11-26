@@ -5,15 +5,20 @@ export NoOceanHeatTransport, OceanHeatDiffusion
 """No horizontal heat transport in the slab ocean mixed layer (default). The
 sea surface temperature tendency of [`SlabOcean`](@ref) then only consists of the surface fluxes."""
 struct NoOceanHeatTransport <: AbstractOceanHeatTransport end
+NoOceanHeatTransport(::SpectralGrid) = NoOceanHeatTransport()
 
+variables(::NoOceanHeatTransport, ::AbstractModel) = ()
 initialize!(::NoOceanHeatTransport, ::AbstractOcean, ::AbstractModel) = nothing
 heat_transport!(dsst, vars, ::NoOceanHeatTransport, ocean, model) = nothing
+heat_transport_changed!(::NoOceanHeatTransport, ::AbstractOcean, ::AbstractModel) = nothing
 
 """Horizontal diffusion of the mixed-layer temperature of a [`SlabOcean`](@ref), a simple
 parameterization of ocean heat transport by eddies and currents. Conservative finite-volume
 discretization on ring grids, precomputed at `initialize!`. Heat (not temperature) is the conserved
 quantity, there is no flux through coastlines (every face is weighted by the smaller ocean fraction
-of its two cells) and the transport continues under sea ice. Between neighbouring rings the temperature
+of its two cells). The transport continues under sea ice, there the heat it conserves is not conserved by the
+coupled system though as [`ThermodynamicSeaIce`](@ref) has no energy budget: heat converging under
+the ice melts it, heat diverging grows it, with the sea surface temperature held at freezing. Between neighbouring rings the temperature
 of both rings is linearly interpolated in longitude to the midpoints of the segments of the
 shared face. To be used like
 
@@ -23,7 +28,8 @@ The transport is set by the depth-integrated diffusivity `diffusivity_depth` [m�
 `density * specific_heat_capacity * diffusivity_depth * ∇T`, so the transport does not depend on the mixed-layer
 depth `H` and the diffusivity is `D = diffusivity_depth / H`. The default 1.25e6 m³/s is Codron's (2012, Clim. Dyn.,
 doi:10.1007/s00382-011-1031-3) 25000 m²/s for a 50 m layer. Alternatively set `diffusivity` [m²/s] directly, independent
-of the depth. Both are independent of the planet's radius. The land-sea mask has to be set before `initialize!`.
+of the depth. Both are independent of the planet's radius. The stencil is built from the land-sea mask at `initialize!`
+and rebuilt by `set!(model; land_sea_mask)` and `set!(model; Δt)`.
 Any grid with iso-latitude rings and equidistant longitudes per ring is supported, rings at the poles are not.
 The scheme is explicit in time, so at `initialize!` the number of substeps per ocean time step is chosen such that
 the stability number is below 0.5. Fields and options are $(TYPEDFIELDS)"""
@@ -54,10 +60,6 @@ the stability number is below 0.5. Fields and options are $(TYPEDFIELDS)"""
 
     "[DERIVED] Largest sum of absolute stencil weights [1/s], bounds the largest eigenvalue"
     max_rate::NF = 0
-
-    "[DERIVED] Work arrays for the temperature increment of the substeps"
-    increment::VectorNF = zeros(NF, 0)
-    increment_next::VectorNF = zeros(NF, 0)
 end
 
 """$(TYPEDSIGNATURES) Generator using the number format, array type and architecture of `spectral_grid`."""
@@ -67,36 +69,50 @@ function OceanHeatDiffusion(SG::SpectralGrid; kwargs...)
     weights = on_architecture(architecture, zeros(NF, 0, 0))
     area = on_architecture(architecture, zeros(NF, 0))
     return OceanHeatDiffusion{NF, typeof(columns), typeof(weights), typeof(area)}(;
-        columns, weights, area, increment = copy(area), increment_next = copy(area), kwargs...
+        columns, weights, area, kwargs...
     )
 end
 
+# work arrays for the temperature increment of the explicit substeps
+variables(::OceanHeatDiffusion, ::AbstractModel) = (
+    ScratchVariable(:heat_transport_increment, Grid2D(), namespace = :ocean, desc = "Temperature increment of ocean heat transport", units = "K"),
+    ScratchVariable(:heat_transport_increment_next, Grid2D(), namespace = :ocean, desc = "Temperature increment of ocean heat transport", units = "K"),
+)
+
 function initialize!(heat_transport::OceanHeatDiffusion{NF}, ocean::AbstractOcean, model::AbstractModel) where {NF}
-    D = isnan(heat_transport.diffusivity) ? heat_transport.diffusivity_depth / ocean.mixed_layer_depth : heat_transport.diffusivity
-    heat_transport.diffusivity_used = D
+    (; diffusivity, diffusivity_depth) = heat_transport
+    diffusivity_used = isnan(diffusivity) ? diffusivity_depth / ocean.mixed_layer_depth : diffusivity
+    heat_transport.diffusivity_used = diffusivity_used
 
     arch = architecture(model.land_sea_mask.land_fraction)
     land_fraction = on_architecture(CPU(), model.land_sea_mask.land_fraction)
     columns, weights, area = ring_diffusion_stencil(
-        model.spectral_grid.grid, land_fraction, Float64(D), Float64(model.geometry.radius[])
+        model.spectral_grid.grid, land_fraction, Float64(diffusivity_used), Float64(model.geometry.radius[])
     )
 
     heat_transport.max_rate = NF(maximum(sum(abs, weights, dims = 2)))
     heat_transport.columns = on_architecture(arch, columns)
     heat_transport.weights = on_architecture(arch, NF.(weights))
     heat_transport.area = on_architecture(arch, NF.(area))
-    heat_transport.increment = on_architecture(arch, zeros(NF, length(area)))
-    heat_transport.increment_next = on_architecture(arch, zeros(NF, length(area)))
 
     # explicit Euler is stable if Δt * (largest eigenvalue magnitude) < 2, which max_rate (Gershgorin) bounds,
-    # substep such that the stability number is below max_stability, fixed here so that it is a constant later
-    number = stability_number(heat_transport, model.time_stepping.Δt)
+    # substep such that the stability number is below max_stability, fixed here so that it is a constant later,
+    # using the time step of the ocean, which can differ from the atmosphere's (e.g. 2Δt when leapfrogging)
+    Δt_ocean = default_time_step(time_stepper(model.time_stepping, :ocean))
+    number = stability_number(heat_transport, Δt_ocean)
     heat_transport.substeps = max(1, ceil(Int, number / heat_transport.max_stability))
     return nothing
 end
 
+# rebuild the stencil if it has been built already, called by set!(model; land_sea_mask, Δt)
+function heat_transport_changed!(heat_transport::OceanHeatDiffusion, ocean::AbstractOcean, model::AbstractModel)
+    size(heat_transport.columns, 1) > 0 && initialize!(heat_transport, ocean, model)
+    return nothing
+end
+
 """$(TYPEDSIGNATURES) Stability number of the explicit time stepping of `heat_transport` with time step `Δt` [s],
-stable if below 1 (conservatively estimated, the actual limit is typically 1.5-2 times larger), before substepping."""
+stable if below 1, before substepping. The Gershgorin bound `max_rate` is close to the largest eigenvalue of the stencil,
+so this estimate is nearly tight."""
 stability_number(heat_transport::OceanHeatDiffusion, Δt) = Δt * heat_transport.max_rate / 2
 
 """$(TYPEDSIGNATURES)
@@ -113,7 +129,7 @@ function ring_diffusion_stencil(grid::AbstractGrid, land_fraction, D::Real, radi
     npoints = last(rings[end])
     londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
     lats = [deg2rad(latds[first(ring)]) for ring in rings]          # latitude per ring
-    @assert all(abs.(lats) .< π / 2 - 1.0e-9) "OceanHeatDiffusion does not support grids with rings at the poles"
+    all(abs.(lats) .< π / 2 - 1.0e-9) || throw(ArgumentError("OceanHeatDiffusion does not support grids with rings at the poles"))
     nlons = [length(ring) for ring in rings]
     lon0 = [deg2rad(londs[first(ring)]) for ring in rings]          # longitude of 1st point per ring
     lat_edges = [π / 2; (lats[1:(end - 1)] .+ lats[2:end]) ./ 2; -π / 2]
@@ -161,28 +177,30 @@ function ring_diffusion_stencil(grid::AbstractGrid, land_fraction, D::Real, radi
             length_s < 1.0e-12 && continue
             λ = (edges[s] + edges[s + 1]) / 2
             stencils = ntuple(2) do r                               # interpolation of ring r to λ, ocean-fraction weighted
-                u = (λ - offsets[r]) / Δλs[r]
-                k0 = floor(Int, u)
-                frac = u - k0
-                cells = (first(faces[r]) + mod(k0, nlons[j + r - 1]), first(faces[r]) + mod(k0 + 1, nlons[j + r - 1]))
-                wgts = ((1 - frac) * ocean[cells[1]], frac * ocean[cells[2]])
-                total = wgts[1] + wgts[2]
-                inside = first(faces[r]) + mod(floor(Int, u + 0.5), nlons[j + r - 1])   # cell containing λ
-                (cells, wgts ./ ifelse(total > 0, total, 1.0), inside)
+                position = (λ - offsets[r]) / Δλs[r]
+                west = floor(Int, position)
+                frac = position - west
+                cells = (first(faces[r]) + mod(west, nlons[j + r - 1]), first(faces[r]) + mod(west + 1, nlons[j + r - 1]))
+                interpolation_weights = ((1 - frac) * ocean[cells[1]], frac * ocean[cells[2]])
+                total = interpolation_weights[1] + interpolation_weights[2]
+                inside = first(faces[r]) + mod(floor(Int, position + 0.5), nlons[j + r - 1])   # cell containing λ
+                (cells, interpolation_weights ./ ifelse(total > 0, total, 1.0), inside)
             end
-            w = min(ocean[stencils[1][3]], ocean[stencils[2][3]])
-            c = w * cos(lat_edges[j + 1]) * length_s / distance
+            face_ocean = min(ocean[stencils[1][3]], ocean[stencils[2][3]])
+            c = face_ocean * cos(lat_edges[j + 1]) * length_s / distance
             c == 0 && continue
             # flux F = c (T_south - T_north) of interpolated temperatures, into the cell of the north ring and out of
             # the cell of the south ring that contain the segment
             north, south = stencils[1][3], stencils[2][3]
-            for (cell, wgt) in zip(stencils[1][1], stencils[1][2])
-                add!(north, cell, -c * wgt)
-                add!(south, cell, c * wgt)
+            for (cell, weight) in zip(stencils[1][1], stencils[1][2])
+                weight == 0 && continue                                # land cells don't enter (their SST may be NaN)
+                add!(north, cell, -c * weight)
+                add!(south, cell, c * weight)
             end
-            for (cell, wgt) in zip(stencils[2][1], stencils[2][2])
-                add!(north, cell, c * wgt)
-                add!(south, cell, -c * wgt)
+            for (cell, weight) in zip(stencils[2][1], stencils[2][2])
+                weight == 0 && continue
+                add!(north, cell, c * weight)
+                add!(south, cell, -c * weight)
             end
         end
     end
@@ -205,13 +223,15 @@ function heat_transport!(dsst, vars, heat_transport::OceanHeatDiffusion, ocean, 
     sst = get_prognostic_step(vars.prognostic.ocean.sea_surface_temperature, time_stepper(model.time_stepping, :ocean), ocean)
     (; land_fraction) = model.land_sea_mask
     (; columns, weights, substeps) = heat_transport
+    @boundscheck size(columns, 1) == length(dsst) || throw(BoundsError(columns, length(dsst)))   # initialize! called?
     Δt = time_step(model.time_stepping, :ocean, vars.prognostic.clock)
     Δt_substep = Δt / substeps
     arch = architecture(dsst)
 
     # explicit substeps of the temperature increment, kept as increment to avoid cancellation of
     # the (small) increment against the temperature itself in low precision
-    increment, increment_next = heat_transport.increment, heat_transport.increment_next
+    increment = vars.scratch.ocean.heat_transport_increment
+    increment_next = vars.scratch.ocean.heat_transport_increment_next
     increment .= 0
     for _ in 1:substeps
         launch!(

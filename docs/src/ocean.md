@@ -135,9 +135,11 @@ ocean = SlabOcean(spectral_grid, heat_transport = OceanHeatDiffusion(spectral_gr
 ```
 
 `OceanHeatDiffusion` is a conservative finite-volume discretization on ring grids that is
-precomputed at `initialize!` (so set the land-sea mask before). Heat, not temperature, is conserved,
+precomputed at `initialize!` and rebuilt by `set!(model; land_sea_mask)` or `set!(model; Δt)`. Heat, not temperature, is conserved,
 and there is no flux through coastlines: every face between two cells is weighted by the smaller of their
-ocean fractions. The transport continues under sea ice. Between rings the temperature
+ocean fractions. The transport continues under sea ice, but there the coupled system does not conserve heat:
+[`ThermodynamicSeaIce`](@ref) has no energy budget, so heat converging under the ice melts it and
+heat diverging grows it while the sea surface temperature is held at freezing. Between rings the temperature
 is interpolated in longitude to the segments of the shared face, which keeps the discretization of the Laplacian
 accurate for fields that vary with longitude. The flux is ``\rho c\, K \nabla T`` with the depth-integrated
 diffusivity `diffusivity_depth` ``K = D H`` [m³/s] (default 1.25e6, which is Codron's, 2012, 25000 m²/s for a 50 m layer)

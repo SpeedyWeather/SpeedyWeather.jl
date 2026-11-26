@@ -4,7 +4,7 @@
 
 Date of initial draft: 2026-11-21
 
-Base revision: 32fbfa49d5c9e244340109cdb403e8642b3f90f2
+Base revision: 7626f058bf27fb0a43472830fb8fcb955780de68
 
 ## Originating prompt
 
@@ -13,8 +13,11 @@ Base revision: 32fbfa49d5c9e244340109cdb403e8642b3f90f2
 
 ## Revision log
 
-- Diffusivity parametrized by the depth-integrated D H instead of Codron's 2-layer rule D = 25000·50/(H+150), which applies
-  to both layers; automatic substepping instead of a warning.
+- Diffusivity parametrized by the depth-integrated D H, Codron's rule that D varies inversely with the total depth
+  (D = 25000·50/(Hs+Hd) in his 2 layers), applied to the single layer; automatic substepping instead of a warning.
+- After review: work arrays are scratch variables, `set!(model; land_sea_mask, Δt)` rebuilds the stencil, substeps
+  use the ocean's time step, a bounds check catches a missing `initialize!`, land cells don't enter the interpolation,
+  documented that sea ice breaks heat conservation of the coupled system, tests also on the HEALPix grid.
 
 ## Problem description
 
@@ -50,8 +53,9 @@ A section "Ocean heat transport" in `docs/src/ocean.md`.
 
 ## Known limitations
 
-- Explicit in time (substeps fixed at `initialize!`, so changing the time step afterwards needs a new `initialize!`), mixed-layer depth is uniform.
-- The land-sea mask has to be set before `initialize!`.
+- Explicit in time (substeps fixed at `initialize!`, rebuilt by `set!(model; Δt)`), mixed-layer depth is uniform.
+- Changing `model.land_sea_mask` other than through `set!` after `initialize!` needs a new `initialize!`.
+- `ThermodynamicSeaIce` has no energy budget, so under sea ice heat is not conserved by the coupled system.
 - Rings at the poles (e.g. a Clenshaw grid with poles) are not supported.
 
 ## Future work
