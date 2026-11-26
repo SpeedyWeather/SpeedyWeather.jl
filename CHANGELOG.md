@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Terrarium land: one Terrarium step per SpeedyWeather step by default (`Δt = nothing`) so both clocks stay in sync, also over the Leapfrog half steps; a given `Δt` is a maximum sub-step, each step is split into equal sub-steps; fixes test compatibility with Terrarium v0.2 [#1390](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1390)
+- Fix the differentiability of the Terrarium land coupling: coupler-defined Terrarium `Field`s (e.g. the top-layer soil porosity) are built once at allocation instead of in `timestep!`, plus Enzyme tests for the coupled model [#1405](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1405)
 - `set!` and the initial conditions remove the extra degree lmax+1 from spectral prognostic variables, opt out with `set!(...; truncate = false)`; `truncate_extra_degree!` (LowerTriangularArrays v1.1.0) replaces `zero_last_degree!` [#1440](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1440)
 - Splits Reactant tests into unit tests and correctness tests [#1443](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1443)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
@@ -17,6 +19,7 @@
 - Eccentric orbits: `planet.orbit` is `KeplerOrbit()` (new default, with eccentricity and longitude of perihelion) or `CircularOrbit()` (previous), which defines its variables (the distance factor (a/r)²), is computed once per time step by the solar zenith, and scales the solar constant in all shortwave schemes via `solar_distance_factor(vars)`; `ScalarDim` variables (the distance factor, CO₂, `prognostic.scale`) are allocated with `scalar_ref`, which moved to SpeedyWeatherInternals (v1.1.0), so a compiled Reactant step can write them; `ExponentialCO2` runs with Reactant (`datetime2unix(::ReactantDateTime)` in the Reactant extension, years since start kept in Float64) [#1407](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1407)
 - Fixes a bug that the `custom_parameterization` was incorrectly not initialized [#1419](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1419)
 - Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that (`random_process!(vars, process)` is now `update_random!`); `SpectralWhiteNoiseProcess` is a `SpectralAR1Process` with `time_scale = 0`, `SpectralAR1Process` now has real m = 0 coefficients, no noise on the last degree and is spectrally flat for `wavenumber = 0` (changes its random patterns) [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
+- Allow Terrarium v0.2 in compat for the Terrarium extension [#1442](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1442)
 
 ## v0.25
 
