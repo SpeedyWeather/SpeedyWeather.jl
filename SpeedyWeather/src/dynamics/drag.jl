@@ -126,7 +126,7 @@ antiparallel to the flow, see `drag!(::Variables, ::SpeedLimitDrag, ::AbstractMo
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SpeedLimitDrag{NF, FI <: AbstractRelaxationIntegration} <: AbstractDrag
     "[OPTION] drag coefficient [1/m]"
-    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
+    @param drag::NF = 1.0e-4 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
     @param speed_limit::NF = 80 (bounds = Nonnegative,)
