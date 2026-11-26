@@ -112,9 +112,10 @@ end
     @test terrarium_clock.iteration == nsteps
     @test terrarium_clock.time == sim.variables.prognostic.clock.time
 
-    # adapting the variables (e.g. into kernel arguments) drops the Terrarium state and keeps everything else
+    # adapting the variables (e.g. into kernel arguments) adapts the mutable Terrarium state to a NamedTuple
+    # (Terrarium's own `adapt_structure`) and keeps everything else
     adapted = SpeedyWeather.Adapt.adapt(Array, sim.variables)
-    @test isnothing(adapted.prognostic.land.terrarium)
+    @test adapted.prognostic.land.terrarium isa NamedTuple
     @test adapted.prognostic.land.soil_temperature == sim.variables.prognostic.land.soil_temperature
     @test adapted.grid.temperature == sim.variables.grid.temperature
     @test sim.variables.prognostic.land.terrarium isa Terrarium.StateVariables
@@ -133,7 +134,9 @@ end
     )
 
     soil_initializer = Terrarium.SoilInitializer(eltype(column_grid))
-    soil_model = Terrarium.SoilModel(column_grid; initializer = soil_initializer)
+    # the value boundary condition below (`PrescribedSurfaceTemperature`) requires an explicit timestepper
+    timestepper = Terrarium.ForwardEuler(eltype(column_grid))
+    soil_model = Terrarium.SoilModel(column_grid; initializer = soil_initializer, timestepper)
 
     # InputSource for air temperature — consumed by the dry land boundary condition
     air_temperature_field = Terrarium.Field(column_grid, Terrarium.XY())
