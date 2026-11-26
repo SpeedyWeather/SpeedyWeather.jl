@@ -154,7 +154,8 @@ end
 Write `field` (on the output grid and the model's architecture) of `variable` into `output`:
 copy it into its `host` equivalent (no-op on CPU where `host === field`), round its
 mantissa bits for compression if `variable` has `keepbits` (on the host, as rounding is
-cheap there) and write via the backend-specific [`write_array!`](@ref)."""
+cheap there, NaNs are kept, see [`round_mantissa!`](@ref)) and write via the
+backend-specific [`write_array!`](@ref)."""
 function write_output!(
         output::AbstractOutput,
         variable::AbstractOutputVariable,
@@ -163,10 +164,27 @@ function write_output!(
     )
     host === field || copyto!(host.data, field.data)     # device to host
     if hasproperty(variable, :keepbits)                  # round mantissabits for compression
-        round!(host, variable.keepbits)
+        round_mantissa!(host.data, variable.keepbits)
     end
     write_array!(output, variable, host)
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Round the mantissa of every element of `x` in-place to `keepbits` bits for compression
+(IEEE round to nearest, tie to even, as `BitInformation.round!`) but write NaNs as `NaN`.
+The rounding adds half a unit in the last place to the bit pattern, which for a NaN with
+trailing payload bits set carries into the exponent and sign bits, turning it into ±0 or
+±Inf: the NaN `0x7fffffff` that CUDA arithmetic produces (e.g. a masked value after the
+interpolation onto the output grid on the GPU) would be written as -0, and even `NaN32`
+itself becomes -0 for `keepbits = 0`."""
+function round_mantissa!(x::AbstractArray{T}, keepbits::Integer) where {T <: Base.IEEEFloat}
+    nan = T(NaN)
+    @inbounds for i in eachindex(x)
+        xᵢ = x[i]
+        x[i] = ifelse(isnan(xᵢ), nan, round(xᵢ, keepbits))
+    end
+    return x
 end
 
 function set!(output::AbstractOutput; active, reset_path = true)
@@ -242,7 +260,7 @@ function output!(
     field, host = scratch_fields(output, variable)
 
     # everything but the I/O (write_output!), compiled with Reactant in case it's used
-    # the `@maybe_jit` here is just a fallback in case this is called output of the regular output 
+    # the `@maybe_jit` here is just a fallback in case this is called output of the regular output
     @maybe_jit architecture(field) interpolate_output!(field, output, variable, simulation)
     write_output!(output, variable, field, host)    # to host, round and write
     return nothing

@@ -3,6 +3,12 @@
 ## Unreleased
 
 - `DiagnosticClouds(humidity_smoothing_thickness = 1/8)` averages relative humidity over a fixed σ window before taking its free-tropospheric maximum, so that cloud cover does not increase with the number of layers (default `0`, unchanged) [#XXXX](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/XXXX)
+- `set!` and the initial conditions remove the extra degree lmax+1 from spectral prognostic variables, opt out with `set!(...; truncate = false)`; `truncate_extra_degree!` (LowerTriangularArrays v1.1.0) replaces `zero_last_degree!` [#1440](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1440)
+- Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
+- Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
+- Interpolation (of initial conditions/boundary conditions) always in model precision; Reactant tests revised [#1438](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1438)
+- Fixes a bug that restart files of Reactant simulations could not be read back [#1437](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1437)
+- Fixes a bug that NaNs in the output of GPU simulations were written as -0: the NaN that GPU arithmetic produces did not survive the mantissa rounding (`keepbits`), output is now rounded with `round_mantissa!` which keeps NaNs [#1433](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1433)
 - Output writers revised to do all computations except for I/O in `interpolate_output!` which may be compiled by Reactant to accelearted output [#1408](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1408)
 - Fixes a bug in `UpwindVerticalAdvection` that coefficients were in the wrong order [#1425](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1425)
 - New variable group `variables.output` declared via `OutputVariable` for output-only variables, accumulated precipitation and river runoff moved there from `variables.parameterizations`. New `model.diagnostics` with `Accumulate` (parameterizations only write rates), `Maximum` and `Mean`, reset by the output writer so precipitation output is since the last output (rate output variables removed), output variables are written to restart files [#1362](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1362)
@@ -11,6 +17,7 @@
 - Eccentric orbits: `planet.orbit` is `KeplerOrbit()` (new default, with eccentricity and longitude of perihelion) or `CircularOrbit()` (previous), which defines its variables (the distance factor (a/r)²), is computed once per time step by the solar zenith, and scales the solar constant in all shortwave schemes via `solar_distance_factor(vars)`; `ScalarDim` variables (the distance factor, CO₂, `prognostic.scale`) are allocated with `scalar_ref`, which moved to SpeedyWeatherInternals (v1.1.0), so a compiled Reactant step can write them; `ExponentialCO2` runs with Reactant (`datetime2unix(::ReactantDateTime)` in the Reactant extension, years since start kept in Float64) [#1407](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1407)
 - Fixes a bug that the `custom_parameterization` was incorrectly not initialized [#1419](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1419)
 - Introduces a `StochasticLeapfrog` integrator that uses a Wiener process for a stochastic integration of the model, revised `AbstractRandomProcess` to accomodate for that (`random_process!(vars, process)` is now `update_random!`); `SpectralWhiteNoiseProcess` is a `SpectralAR1Process` with `time_scale = 0`, `SpectralAR1Process` now has real m = 0 coefficients, no noise on the last degree and is spectrally flat for `wavenumber = 0` (changes its random patterns) [#1397](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1397)
+- Allow Terrarium v0.2 in compat for the Terrarium extension [#1442](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1442)
 
 ## v0.25
 
