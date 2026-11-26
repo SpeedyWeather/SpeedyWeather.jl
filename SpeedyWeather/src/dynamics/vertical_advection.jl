@@ -26,12 +26,15 @@ function vertical_advection!(vars::Variables, model)
     advection_scheme = model.vertical_advection
     (; w) = vars.dynamics
 
+    # integration interval of this time step, only needed by `SubcycledVerticalAdvection`, `nothing` otherwise
+    interval = advection_interval(advection_scheme, vars, model)
+
     # unrolled over compile-time variable names (instead of a loop over runtime symbols)
     # to avoid Union-typed variables which Enzyme cannot differentiate
-    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
-    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model, interval)
+    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model, interval)
+    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model, interval)
+    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model, interval)
 
     for (name, tracer) in model.tracers
         if tracer.active
@@ -39,7 +42,7 @@ function vertical_advection!(vars::Variables, model)
             ξ = vars.grid.tracers[name]
             s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
             s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme, model)
-            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
+            _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme, interval, vars.scratch)
         end
     end
     return nothing
@@ -47,7 +50,7 @@ end
 
 # var is a compile-time constant so that haskey and getproperty constant-fold to
 # concrete variables (type-stable, required for Enzyme differentiability)
-@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model) where {var}
+@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model, interval = nothing) where {var}
     haskey(vars.tendencies.grid, var) || return nothing
     # Pass the full step-dimensioned fields plus the step index, rather than a `get_*_step`
     # view. The stencil kernel reads ξ at many vertical offsets per point, and indexing a
@@ -57,8 +60,11 @@ end
     ξ = vars.grid[var]
     s_tend = which_tendency_step(ξ_tend, model.time_stepping, advection_scheme)
     s_prog = which_prognostic_step(ξ, model.time_stepping, advection_scheme)
-    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme)
+    return _vertical_advection!(ξ_tend, s_tend, w, ξ, s_prog, Δσ, advection_scheme, interval, vars.scratch)
 end
+
+# integration interval of the current time step, not needed by the single-evaluation schemes
+advection_interval(::AbstractVerticalAdvection, vars, model) = nothing
 
 function _vertical_advection!(
         ξ_tend::AbstractField,      # tendency of quantity ξ (full, with step dimension)
@@ -67,7 +73,9 @@ function _vertical_advection!(
         ξ::AbstractField,           # ξ (full, with step dimension)
         s_prog::Integer,            # step of ξ to advect
         Δσ,                         # layer thickness on σ levels
-        adv::VerticalAdvection      # vertical advection scheme of order B
+        adv::VerticalAdvection,     # vertical advection scheme of order B
+        interval = nothing,         # not needed, one evaluation per time step
+        scratch = nothing,          # not needed
     )
     grids_match(ξ_tend, w, ξ) || throw(DimensionMismatch(ξ_tend, w, ξ))
 

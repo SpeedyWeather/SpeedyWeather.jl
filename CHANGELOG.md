@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `SubcycledVerticalAdvection`: Courant-adaptive, per-column subcycled SSP-RK3/WENO5 vertical advection, stable for vertical Courant numbers > 1 with many layers [#1436](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1436)
+- `SubcycledVerticalAdvection(spectral_grid; scheme, courant_target, substeps)`: per-column subcycled SSP-RK3 vertical advection (default WENO5 stages), Courant-adaptive or with a fixed number of substeps, stable for vertical Courant numbers > 1 with many layers [#1436](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1436)
 - `set!` and the initial conditions remove the extra degree lmax+1 from spectral prognostic variables, opt out with `set!(...; truncate = false)`; `truncate_extra_degree!` (LowerTriangularArrays v1.1.0) replaces `zero_last_degree!` [#1440](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1440)
 - Fix re-evaporation bug in the large-scale precipitation scheme to close the water budget [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)
 - Reevaporation dependent on layer-thickness [#1431](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1431)

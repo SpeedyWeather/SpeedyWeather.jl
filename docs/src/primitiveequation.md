@@ -381,10 +381,15 @@ However, note that this scheme is dispersive and easily leads to instabilities a
 
 With many vertical layers the vertical Courant number ``|\dot{\sigma}| \Delta t / \Delta \sigma`` easily exceeds 1 in
 strong ascent, e.g. ``|w| \gtrsim 0.3`` m/s for 100 layers with ``\Delta t = 300`` s, and all of the schemes above
-become unstable. `SubcycledVerticalAdvection(spectral_grid; courant_target = 1, max_substeps = 16)` splits the time
-step per column into as many substeps as needed to keep the Courant number of each substep below `courant_target`,
-each a 3-stage strong-stability-preserving Runge-Kutta step of the WENO operator. Columns with weak vertical motion
-take a single substep, so the extra cost is mostly 3 instead of 1 evaluations of the column operator.
+become unstable. `SubcycledVerticalAdvection(spectral_grid; scheme = WENOVerticalAdvection(spectral_grid), courant_target = 1, substeps = 16)`
+splits the time step per column into as many substeps as needed (at most `substeps`) to keep the Courant number of each
+substep below `courant_target`. Each substep is a 3-stage strong-stability-preserving Runge-Kutta step of the operator
+of `scheme`, which is linearly stable up to a Courant number of about 1.43 for WENO. Columns with weak vertical motion
+take a single substep (3 evaluations of the column operator instead of 1), so the cost depends on the flow. With
+`courant_target = nothing` every column takes exactly `substeps` substeps instead, which makes the cost independent of the flow.
+
+Like the other diffusive schemes, it advects the variables of the previous time step over the whole leapfrog interval
+``2\Delta t`` and adds the mean tendency, so the vertical advection is effectively operator-split from the other tendencies.
 
 ### Vertical velocity
 
