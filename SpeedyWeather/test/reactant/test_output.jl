@@ -115,7 +115,10 @@ using Zarr
     @testset "Compiled output of all variables" begin
         variables = (
             OutputVariables.Divergence(), OutputVariables.SurfaceTemperature(),
-            OutputVariables.ZonalVelocity10m(), OutputVariables.PrecipitableWater(),
+            # the height of the bottom layer is computed in a kernel, in a broadcast Reactant traces the
+            # layer index for which `pressure(k::Integer, ...)` doesn't apply
+            OutputVariables.ZonalVelocity10m(),
+            OutputVariables.PrecipitableWater(),
             OutputVariables.LandSeaMask(),      # no time dimension, only written with the initial conditions
         )
         simulations = map((SpeedyWeather.CPU(), ReactantDevice())) do architecture
@@ -161,31 +164,5 @@ using Zarr
             end
         end
         foreach(close, datasets)
-    end
-
-    # the height of the bottom layer is computed in a kernel, in a broadcast Reactant traces the
-    # layer index for which `pressure(k::Integer, ...)` doesn't apply
-    @testset "10m wind output on Reactant" begin
-        variable = OutputVariables.ZonalVelocity10m()
-        simulations = map((SpeedyWeather.CPU(), ReactantDevice())) do architecture
-            spectral_grid = SpectralGrid(; architecture, nlayers = 8, truncation = TRUNCATION)
-            spectral_transform = MatrixSpectralTransform(spectral_grid)
-            path = mktempdir(pwd(), prefix = "tmp_reactant_nc_")
-            output = NetCDFOutput(spectral_grid, PrimitiveDryModel; path)
-            add!(output, variable)
-            model = PrimitiveDryModel(spectral_grid; spectral_transform, feedback = nothing, output)
-            initialize!(model)
-        end
-        sync_variables!(simulations...)     # same state on CPU and Reactant
-
-        z_bottom = map(simulations) do simulation
-            initialize!(simulation; steps = 1, output = true)   # writes the initial conditions incl. u10
-            SpeedyWeather.output!(simulation.model.output, variable, simulation)
-            z_bottom = on_architecture(SpeedyWeather.CPU(), simulation.variables.scratch.grid.a_2D.data)
-            finalize!(simulation)
-            z_bottom
-        end
-        @test all(isfinite, z_bottom[2])
-        @test z_bottom[2] ≈ z_bottom[1]
     end
 end

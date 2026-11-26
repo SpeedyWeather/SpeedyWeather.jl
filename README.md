@@ -11,7 +11,7 @@
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_LowerTriangularArrays.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_LowerTriangularArrays.yml)
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeatherInternals.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeatherInternals.yml)
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Enzyme.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Enzyme.yml)
-[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant_Correctness.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant_Correctness.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant.yml)
 
 SpeedyWeather.jl is a global atmospheric model developed as a research playground
 with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
