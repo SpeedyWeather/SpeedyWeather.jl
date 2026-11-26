@@ -6,11 +6,11 @@ export BettsMillerConvection
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct BettsMillerConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
-    "[OPTION] Relaxation time for profile adjustment (at T32, see `resolution_scaling`)"
+    "[OPTION] Relaxation time for profile adjustment (at T32 if `resolution_scaling`)"
     time_scale::Second = Hour(4)
 
-    "[OPTION] Shorter relaxation time with resolution? 0: constant, 1: time_scale × 32/truncation, etc"
-    resolution_scaling::NF = 0
+    "[OPTION] Shorten the relaxation time with resolution, `time_scale × 32/truncation`? Otherwise constant"
+    resolution_scaling::Bool = true
 
     "Spectral truncation the relaxation time is scaled with, set from the SpectralGrid"
     truncation::Int = 32
@@ -35,11 +35,12 @@ BettsMillerConvection(SG::SpectralGrid; entrainment = LinearEntrainment(SG), kwa
     BettsMillerConvection{SG.NF, typeof(entrainment)}(; entrainment, truncation = SG.truncation, kwargs...)
 
 """$(TYPEDSIGNATURES)
-Relaxation time [s] of the Betts-Miller scheme, `time_scale × (32 / truncation)^resolution_scaling`,
-following the resolution scaling of the horizontal diffusion."""
+Relaxation time [s] of the Betts-Miller scheme, `time_scale × 32/truncation` with `resolution_scaling = true`
+(the default, following the resolution scaling of the horizontal diffusion), `time_scale` otherwise."""
 function relaxation_time(convection::BettsMillerConvection{NF}) where {NF}
     (; time_scale, resolution_scaling, truncation) = convection
-    return convert(NF, Second(time_scale).value) * (NF(32) / truncation)^resolution_scaling
+    scaling = ifelse(resolution_scaling, NF(32) / truncation, one(NF))
+    return convert(NF, Second(time_scale).value) * scaling
 end
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
