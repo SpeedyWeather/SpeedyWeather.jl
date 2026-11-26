@@ -47,6 +47,12 @@ Base revision: 75bf89d9aeac994eb8857a06d136a5ceafec0099
 >   TetensEquation or is that now simply overhauled by MagnusBolton? If the latter then delete?")
 >   removed: unused, liquid branch superseded by `MagnusBolton`, ice branch by `IFSMixedPhase`.
 >   Exported, so a UI change, covered by the pending `0.26.0-DEV`.
+> - 2026-11-26, review: "could you find a rule of thumb when to use `convert` with Reactant is okay,
+>   when not? ... Would explicit promotion be any different to `convert`?" Tested with Reactant
+>   0.2.308: `convert(Float32, ::TracedRNumber)` has no method (fails for traced temperatures and
+>   plain parameters), promotion works but widens Float64 inputs. New `convert_number_format(NF, x)`
+>   (Reactant method converts only the element type) replaces `convert(typeof(T₀), T)`; rule of thumb
+>   added to CLAUDE.md; Reactant test `test/reactant/test_thermodynamics.jl`.
 
 ## Problem description
 

@@ -102,6 +102,15 @@ end
     model = PrimitiveWetModel(spectral_grid; atmosphere)
     @test model.atmosphere.saturation isa MagnusBolton{Float32}
 
+    # the formulation, not the input temperature, determines the number format
+    @test SpeedyWeather.convert_number_format(Float32, 280.0) === 280.0f0
+    @test SpeedyWeather.convert_number_format(Float64, 280.0f0) === 280.0
+    for SVP in (ClausiusClapeyronConstantL, ClausiusClapeyronLinearL, IFSMixedPhase, MagnusBolton)
+        atmosphere = EarthAtmosphere(spectral_grid, saturation = SVP(spectral_grid))
+        @test SpeedyWeather.saturation_vapor_pressure(260.0, atmosphere) isa Float32
+        @test SpeedyWeather.grad_saturation_vapor_pressure(260.0, atmosphere) isa Float32
+    end
+
     # dry atmosphere has no saturation
     dry = EarthDryAtmosphere(spectral_grid)
     @test SpeedyWeather.saturation_vapor_pressure(280.0f0, dry) == 0

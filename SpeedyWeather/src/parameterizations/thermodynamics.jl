@@ -1,5 +1,14 @@
 abstract type AbstractSaturationVaporPressure end
 
+"""$(TYPEDSIGNATURES)
+Convert number `x` to the number format of type `NF`, e.g. the temperature passed to a saturation
+vapor pressure formulation to the number format of its constants, so that the formulation (not the
+input) determines the precision of the calculation. Unlike `convert(NF, x)` this also works with
+Reactant: a traced `x` (`TracedRNumber`) can't be converted to a plain number type, only its element
+type is converted (method in the Reactant extension). Unlike promotion it never widens, e.g. a Float64
+input is converted to Float32 for `NF = Float32`."""
+@inline convert_number_format(::Type{NF}, x) where {NF} = convert(NF, x)
+
 export ClausiusClapeyronConstantL, ClausiusClapeyronLinearL, IFSMixedPhase, MagnusBolton
 
 # Interface: every formulation implements
@@ -40,12 +49,12 @@ end
     (; e₀, T₀) = svp
     Lᵥ = atmosphere.latent_heat_condensation
     Rᵥ = atmosphere.R_vapor
-    T = convert(typeof(T₀), T)
+    T = convert_number_format(typeof(T₀), T)
     return e₀ * exp(Lᵥ / Rᵥ * (inv(T₀) - inv(T)))
 end
 
 @inline function grad(svp::ClausiusClapeyronConstantL, T, atmosphere)
-    T = convert(typeof(svp.T₀), T)
+    T = convert_number_format(typeof(svp.T₀), T)
     eₛ = saturation_vapor_pressure(svp, T, atmosphere)
     return eₛ * atmosphere.latent_heat_condensation / (atmosphere.R_vapor * T^2)
 end
@@ -85,7 +94,7 @@ end
 
 @inline function saturation_vapor_pressure(svp::ClausiusClapeyronLinearL, T, atmosphere)
     (; e₀, T₀, E₀ᵥ, Rᵥ, c_vv, c_vl) = svp
-    T = convert(typeof(T₀), T)
+    T = convert_number_format(typeof(T₀), T)
     a = (c_vv + Rᵥ - c_vl) / Rᵥ          # c_pv = c_vv + Rᵥ
     b = (E₀ᵥ - (c_vv - c_vl) * T₀) / Rᵥ
     return e₀ * (T / T₀)^a * exp(b * (inv(T₀) - inv(T)))
@@ -93,7 +102,7 @@ end
 
 @inline function grad(svp::ClausiusClapeyronLinearL, T, atmosphere)
     (; T₀, E₀ᵥ, Rᵥ, c_vv, c_vl) = svp
-    T = convert(typeof(T₀), T)
+    T = convert_number_format(typeof(T₀), T)
     a = (c_vv + Rᵥ - c_vl) / Rᵥ
     b = (E₀ᵥ - (c_vv - c_vl) * T₀) / Rᵥ
     eₛ = saturation_vapor_pressure(svp, T, atmosphere)
@@ -147,7 +156,7 @@ end
 
 @inline function saturation_vapor_pressure(svp::IFSMixedPhase, T, atmosphere)
     (; e₀, T₀, a_liquid, b_liquid, a_ice, b_ice) = svp
-    T = convert(typeof(T₀), T)
+    T = convert_number_format(typeof(T₀), T)
     α = liquid_fraction(svp, T)
     e_liquid = tetens(e₀, T₀, a_liquid, b_liquid, T)
     e_ice = tetens(e₀, T₀, a_ice, b_ice, T)
@@ -156,7 +165,7 @@ end
 
 @inline function grad(svp::IFSMixedPhase, T, atmosphere)
     (; e₀, T₀, T_ice, a_liquid, b_liquid, a_ice, b_ice) = svp
-    T = convert(typeof(T₀), T)
+    T = convert_number_format(typeof(T₀), T)
     α = liquid_fraction(svp, T)
     mixed = (T > T_ice) & (T < T₀)
     dα_dT = ifelse(mixed, 2 * (T - T_ice) / (T₀ - T_ice)^2, zero(T))
@@ -190,12 +199,12 @@ end
 
 @inline function saturation_vapor_pressure(svp::MagnusBolton, T, atmosphere)
     (; e₀, T₀, a, b) = svp
-    T = convert(typeof(T₀), T)
+    T = convert_number_format(typeof(T₀), T)
     return tetens(e₀, T₀, a, T₀ - b, T)
 end
 
 @inline function grad(svp::MagnusBolton, T, atmosphere)
     (; e₀, T₀, a, b) = svp
-    T = convert(typeof(T₀), T)
+    T = convert_number_format(typeof(T₀), T)
     return grad_tetens(e₀, T₀, a, T₀ - b, T)
 end

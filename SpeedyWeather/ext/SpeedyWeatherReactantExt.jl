@@ -144,6 +144,11 @@ SpeedyWeather.on_architecture(::SpeedyWeather.CPU, x::Base.RefValue{<:Reactant.C
 
 # TODO: move upstream to Reactant, ReactantDatesExt defines Dates.year(::ReactantDateTime) via
 # Dates.year(days) for which Dates' method branches on the traced month, use yearmonthday instead
+# convert only the element type of a traced number, `convert(Float32, ::TracedRNumber)` has no method,
+# a traced `NF` (e.g. parameters traced for differentiation) is unwrapped to its element type
+SpeedyWeather.convert_number_format(::Type{NF}, x::Reactant.TracedRNumber) where {NF} =
+    Reactant.TracedRNumber{Reactant.unwrapped_eltype(NF)}(x)
+
 Dates.year(days::Reactant.TracedRNumber) = first(Dates.yearmonthday(days))
 
 # TODO: move upstream to Reactant, ReactantDatesExt defines datetime2julian but not datetime2unix,
