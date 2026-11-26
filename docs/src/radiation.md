@@ -494,11 +494,13 @@ and $\mathrm{RH}_{cl}$ is a threshold. Precipitation is in mm/day.
 
 With many layers, the maximum relative humidity over the free troposphere increases with the number of layers:
 there are more samples, thin humid layers are no longer averaged out, and the cloud base layer sits right at the
-humid top of the boundary layer. Setting `humidity_smoothing_thickness` (e.g. `1/8`, the thickness of a layer at L8)
-makes $\mathrm{RH}_{\max}$ the maximum of the relative humidity averaged (Δσ-weighted) over a σ window of that
-thickness centred on each layer. Only layers whose window lies fully above `σ_boundary_layer` are then candidates,
-and the ``Q_{cl}`` exemption applies to the lowest of them. This makes the cloud cover approximately independent of
-the number of layers; the default `0` uses each layer's own relative humidity as in SPEEDY.
+humid top of the boundary layer. With
+`DiagnosticClouds(spectral_grid, humidity_smoothing = HumiditySmoothing(spectral_grid, thickness = 1/8))`
+(`1/8` is the thickness of a layer at L8) $\mathrm{RH}_{\max}$ is the maximum of the relative humidity averaged
+(weighted by the pressure thickness of the layers) over a σ window of that thickness centred on each layer.
+Only layers whose window lies fully above `σ_boundary_layer` are then candidates, and the ``Q_{cl}`` exemption
+applies to the lowest of them. This makes the cloud cover approximately independent of the number of layers;
+the default `NoHumiditySmoothing()` uses each layer's own relative humidity as in SPEEDY.
 
 **Stratocumulus clouds:**
 Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability

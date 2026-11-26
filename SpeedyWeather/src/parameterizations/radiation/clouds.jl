@@ -28,7 +28,7 @@ initialize!(clouds::NoClouds, ::AbstractModel) = nothing
 end
 
 export DiagnosticClouds
-@parameterized @kwdef struct DiagnosticClouds{NF, RI} <: AbstractShortwaveClouds
+@parameterized @kwdef struct DiagnosticClouds{NF, RI, HS} <: AbstractShortwaveClouds
     "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
     @param relative_humidity_threshold_min::NF = 0.3 (bounds = 0 .. 1,)
 
@@ -74,10 +74,10 @@ export DiagnosticClouds
     "[OPTION] Stratocumulus cloud factor [1]"
     @param stratocumulus_cloud_factor::NF = 1.2 (bounds = Nonnegative,)
 
-    "[OPTION] σ thickness over which relative humidity is averaged (Δσ-weighted, centred on each layer)
-    before taking its maximum over the free troposphere, so that cloud cover does not depend on the
-    number of layers, e.g. 1/8 ≈ a layer at L8; 0 = the layer's own relative humidity (legacy)"
-    @param humidity_smoothing_thickness::NF = 0 (bounds = Nonnegative,)
+    "[OPTION] Vertical smoothing of relative humidity before its maximum over the free troposphere is taken,
+    `NoHumiditySmoothing()` (as in SPEEDY) or `HumiditySmoothing(spectral_grid)` for cloud cover that is
+    approximately independent of the number of layers"
+    @component humidity_smoothing::HS = NoHumiditySmoothing()
 
     "[DERIVED] Highest layer in which clouds can form, first layer below the tropopause, set in `initialize!`"
     layer_top::RI = Ref(0)
@@ -87,11 +87,13 @@ export DiagnosticClouds
 end
 
 Adapt.@adapt_structure DiagnosticClouds
-DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF, Base.RefValue{Int}}(; kwargs...)
+DiagnosticClouds(SG::SpectralGrid; humidity_smoothing = NoHumiditySmoothing(), kwargs...) =
+    DiagnosticClouds{SG.NF, Base.RefValue{Int}, typeof(humidity_smoothing)}(; humidity_smoothing, kwargs...)
 
 # the free troposphere layers only depend on the vertical coordinates, precompute them
 function initialize!(clouds::DiagnosticClouds, model::AbstractModel)
     clouds.layer_top[], clouds.cloud_base[] = free_troposphere_layers(clouds, model.geometry.vertical_coordinates)
+    initialize!(clouds.humidity_smoothing, clouds, model)
     return nothing
 end
 
@@ -139,7 +141,6 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     # rename for brevity
     rh_min = clouds.relative_humidity_threshold_min
     rh_max = clouds.relative_humidity_threshold_max
-    q_min = clouds.specific_humidity_threshold_min
     precip_weight = clouds.precipitation_weight
     precip_max = clouds.precipitation_max
     stab_min = clouds.stratocumulus_stability_min
@@ -161,56 +162,9 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     # clouds form in the free troposphere, layers between the tropopause and the boundary layer
     layer_top, cloud_base = clouds.layer_top[], clouds.cloud_base[]
 
-    # Find the layer of maximum relative humidity in the free troposphere (with q > q_min,
-    # except for the cloud base layer directly above the boundary layer as in SPEEDY, so that
-    # clouds can also form in cold and dry polar air), cloud cover is a quadratic function of
-    # that maximum, the cloud top is its layer
-    rh_excess_max::NF = 0
-    cloud_top_humidity = nlayers + 1
-    σ = model.geometry.σ_levels_full
-    Δσ = model.geometry.σ_levels_thick
-    half_window = clouds.humidity_smoothing_thickness / 2
-    smooth = half_window > 0
-
-    # with smoothing, only layers whose averaging window lies fully above the boundary layer are
-    # candidates (at high vertical resolution the cloud_base layer sits right at the humid boundary-layer
-    # top, at L8 it is centred well above); the q_min exemption moves to the lowest such layer
-    σ_bl = clouds.σ_boundary_layer
-    k_low = cloud_base
-    if smooth
-        k_low = layer_top
-        for k in layer_top:cloud_base
-            k_low = ifelse(σ[k] + half_window <= σ_bl, k, k_low)
-        end
-    end
-
-    for k in layer_top:cloud_base
-        humidity_k = humid[ij, k]
-        pₖ = pressure(k, pₛ, vertical_coordinates)
-        qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
-        eligible = !smooth | (k <= k_low)
-        valid = ((humidity_k > q_min) | (k == k_low)) & (qsat > 0) & eligible
-        rh_k = humidity_k / ifelse(qsat > 0, qsat, one(NF))         # avoid division by zero
-
-        # optionally: Δσ-weighted mean relative humidity of the free-tropospheric layers within
-        # ±half_window of layer k (always including k itself), independent of the layer count
-        if smooth
-            rh_sum = zero(NF)
-            w_sum = zero(NF)
-            for j in layer_top:cloud_base
-                pⱼ = pressure(j, pₛ, vertical_coordinates)
-                qsatⱼ = saturation_humidity(temp[ij, j], pⱼ, model.atmosphere)
-                w = ifelse((abs(σ[j] - σ[k]) <= half_window) | (j == k), Δσ[j], zero(NF))
-                rh_sum += w * humid[ij, j] / ifelse(qsatⱼ > 0, qsatⱼ, one(NF))
-                w_sum += w
-            end
-            rh_k = rh_sum / w_sum                                   # w_sum > 0 as j == k is included
-        end
-        rh_excess = rh_k - rh_min
-        new_max = valid & (rh_excess > rh_excess_max)
-        rh_excess_max = ifelse(new_max, rh_excess, rh_excess_max)
-        cloud_top_humidity = ifelse(new_max, k, cloud_top_humidity)
-    end
+    # Find the layer of maximum (optionally vertically smoothed) relative humidity in the free troposphere,
+    # cloud cover is a quadratic function of that maximum, the cloud top is its layer
+    rh_excess_max, cloud_top_humidity = relative_humidity_maximum(ij, temp, humid, pₛ, clouds, model)
     humidity_term = min(1, rh_excess_max / (rh_max - rh_min))^2
 
     # Combined cloud cover
@@ -258,6 +212,124 @@ Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
     stratocumulus_cover = ifelse(clouds.use_stratocumulus & (cloud_base < nlayers), stratocumulus_cover_land_sea, zero(NF))
 
     return (; cloud_cover, cloud_top, cloud_base, stratocumulus_cover)
+end
+
+"""$(TYPEDSIGNATURES)
+Maximum of relative humidity minus `relative_humidity_threshold_min` over the free troposphere and its layer
+(`nlayers + 1` if none) for column `ij`. The relative humidity of each candidate layer (`layer_top` to the
+`lowest_candidate_layer`) is optionally smoothed vertically by `clouds.humidity_smoothing`, see
+`smoothed_relative_humidity`. Only layers with specific humidity above `specific_humidity_threshold_min` count,
+except for the lowest candidate layer (without smoothing the cloud base layer directly above the boundary layer,
+as in SPEEDY), so that clouds can also form in cold and dry polar air."""
+@propagate_inbounds function relative_humidity_maximum(ij, temp, humid, pₛ, clouds::DiagnosticClouds, model)
+    NF = eltype(temp)
+    nlayers = size(temp, 2)
+    (; vertical_coordinates) = model.geometry
+    (; humidity_smoothing) = clouds
+    rh_min = clouds.relative_humidity_threshold_min
+    q_min = clouds.specific_humidity_threshold_min
+    layer_top = clouds.layer_top[]
+    layer_bottom = lowest_candidate_layer(humidity_smoothing, clouds)
+
+    rh_excess_max::NF = 0
+    cloud_top_humidity = nlayers + 1
+    for k in layer_top:layer_bottom
+        humidity_k = humid[ij, k]
+        pₖ = pressure(k, pₛ, vertical_coordinates)
+        qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
+        valid = ((humidity_k > q_min) | (k == layer_bottom)) & (qsat > 0)
+        rh_k = humidity_k / ifelse(qsat > 0, qsat, one(NF))  # avoid division by zero
+        rh_k = smoothed_relative_humidity(rh_k, k, ij, temp, humid, pₛ, humidity_smoothing, clouds, model)
+        rh_excess = rh_k - rh_min
+        new_max = valid & (rh_excess > rh_excess_max)
+        rh_excess_max = ifelse(new_max, rh_excess, rh_excess_max)
+        cloud_top_humidity = ifelse(new_max, k, cloud_top_humidity)
+    end
+    return rh_excess_max, cloud_top_humidity
+end
+
+abstract type AbstractHumiditySmoothing end
+
+export NoHumiditySmoothing
+
+"""No vertical smoothing of relative humidity for `DiagnosticClouds`: cloud cover is diagnosed from the
+maximum of each free-tropospheric layer's own relative humidity, as in SPEEDY."""
+struct NoHumiditySmoothing <: AbstractHumiditySmoothing end
+NoHumiditySmoothing(::SpectralGrid) = NoHumiditySmoothing()
+initialize!(::NoHumiditySmoothing, ::DiagnosticClouds, ::AbstractModel) = nothing
+
+"""$(TYPEDSIGNATURES)
+Lowest layer that is a candidate for the relative humidity maximum of `DiagnosticClouds`: the cloud base
+without smoothing."""
+lowest_candidate_layer(::NoHumiditySmoothing, clouds::DiagnosticClouds) = clouds.cloud_base[]
+
+"""$(TYPEDSIGNATURES)
+Relative humidity `rh_k` of layer `k` in column `ij`, unchanged without smoothing."""
+@propagate_inbounds smoothed_relative_humidity(rh_k, k, ij, temp, humid, pₛ, ::NoHumiditySmoothing, clouds::DiagnosticClouds, model) = rh_k
+
+export HumiditySmoothing
+
+"""Vertical smoothing of relative humidity for `DiagnosticClouds`. Relative humidity is averaged
+(pressure-thickness weighted) over the free-tropospheric layers within a σ window of `thickness` centred
+on each layer before its maximum is taken. Only layers whose window lies fully above the boundary layer
+(`σ_boundary_layer` of the clouds) are candidates for that maximum, and the exemption from the specific
+humidity threshold moves to the lowest of them. With more layers the maximum of the unsmoothed relative
+humidity increases (more samples, thin humid layers resolved, the cloud base layer right at the humid top
+of the boundary layer); the smoothing makes the cloud cover approximately independent of the number of layers.
+$(TYPEDFIELDS)"""
+@kwdef struct HumiditySmoothing{NF, RI} <: AbstractHumiditySmoothing
+    "[OPTION] σ thickness of the averaging window centred on each layer, e.g. 1/8 ≈ a layer at L8 [1]"
+    thickness::NF = 1 / 8
+
+    "[DERIVED] Lowest layer whose window lies above the boundary layer, set in `initialize!`"
+    layer_bottom::RI = Ref(0)
+end
+
+Adapt.@adapt_structure HumiditySmoothing
+HumiditySmoothing(SG::SpectralGrid; kwargs...) = HumiditySmoothing{SG.NF, Base.RefValue{Int}}(; kwargs...)
+
+# the candidate layers only depend on the (surface pressure-independent) σ levels, precompute them,
+# after the free troposphere layers of the clouds
+function initialize!(smoothing::HumiditySmoothing, clouds::DiagnosticClouds, model::AbstractModel)
+    # count on a CPU copy (Reactant can't count over a view of a concrete array, see free_troposphere_layers)
+    σ = sigma_full(Adapt.adapt(Array, model.geometry.vertical_coordinates))
+    layer_top, cloud_base = clouds.layer_top[], clouds.cloud_base[]
+    half_window = smoothing.thickness / 2
+    # σ increases downwards, so the number of layers whose window lies above the boundary layer is the
+    # lowest of them, at least the first layer below the tropopause if none does
+    layers_above = count(σₖ -> σₖ + half_window <= clouds.σ_boundary_layer, view(σ, 1:cloud_base))
+    smoothing.layer_bottom[] = clamp(layers_above, layer_top, cloud_base)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Lowest layer that is a candidate for the relative humidity maximum of `DiagnosticClouds`: the lowest layer
+whose averaging window lies above the boundary layer, precomputed in `initialize!`."""
+lowest_candidate_layer(smoothing::HumiditySmoothing, ::DiagnosticClouds) = smoothing.layer_bottom[]
+
+"""$(TYPEDSIGNATURES)
+Relative humidity of layer `k` in column `ij` averaged over the free-tropospheric layers within a σ window of
+`smoothing.thickness` centred on layer `k`, weighted by their mass (pressure thickness). The window is in σ, which
+is surface pressure-independent also for hybrid coordinates, and always includes layer `k` itself (so that the
+weights sum to > 0), whose relative humidity is recomputed with the others."""
+@propagate_inbounds function smoothed_relative_humidity(rh_k, k, ij, temp, humid, pₛ, smoothing::HumiditySmoothing, clouds::DiagnosticClouds, model)
+    NF = eltype(temp)
+    (; vertical_coordinates) = model.geometry
+    layer_top, cloud_base = clouds.layer_top[], clouds.cloud_base[]
+    half_window = smoothing.thickness / 2
+    σₖ = sigma(k, vertical_coordinates)
+
+    rh_sum = zero(NF)
+    weight_sum = zero(NF)
+    for j in layer_top:cloud_base
+        pⱼ = pressure(j, pₛ, vertical_coordinates)
+        qsatⱼ = saturation_humidity(temp[ij, j], pⱼ, model.atmosphere)
+        in_window = (abs(sigma(j, vertical_coordinates) - σₖ) <= half_window) | (j == k)
+        weight = ifelse(in_window, pressure_thickness(j, pₛ, vertical_coordinates), zero(NF))
+        rh_sum += weight * humid[ij, j] / ifelse(qsatⱼ > 0, qsatⱼ, one(NF))   # avoid division by zero
+        weight_sum += weight
+    end
+    return rh_sum / weight_sum
 end
 
 """$(TYPEDSIGNATURES)
