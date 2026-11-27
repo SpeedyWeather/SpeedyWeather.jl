@@ -379,6 +379,24 @@ With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}`` and ``T_{k-\tfrac{1
 
 However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)`` to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
 
+With many vertical layers the vertical Courant number ``|\dot{\sigma}| \Delta t / \Delta \sigma`` easily exceeds 1 in
+strong ascent, e.g. ``|w| \gtrsim 0.3`` m/s for 100 layers with ``\Delta t = 300`` s, and all of the schemes above
+become unstable. `SubcycledVerticalAdvection(spectral_grid; scheme = WENOVerticalAdvection(spectral_grid), courant_target = 1, substeps = 16)`
+splits the time step per column into as many substeps as needed (at most `substeps`) to keep the Courant number of each
+substep below `courant_target`. Each substep is a 3-stage strong-stability-preserving Runge-Kutta step of the operator
+of `scheme`, which is linearly stable up to a Courant number of about 1.43 for WENO. Columns with weak vertical motion
+take a single substep (3 evaluations of the column operator instead of 1), so the cost depends on the flow. With
+`courant_target = nothing` every column takes exactly `substeps` substeps instead, which makes the cost independent of the flow.
+
+On CPU a call costs 3-4 times that of `WENOVerticalAdvection` (16-28 % of a time step at T31-T127, L8-L100).
+On GPU it is parallel over columns only, so columns that need many substeps hold back the others in their warp:
+at T127 L100 after a 12-hour spin-up (maximum Courant number 6) it costs 14 times `WENOVerticalAdvection`
+(42 % of a time step on an A100), 4 times with a fixed single substep. Use it when the vertical Courant number
+exceeds about 1.4, i.e. with many thin layers; with few layers `WENOVerticalAdvection` is cheaper.
+
+Like the other diffusive schemes, it advects the variables of the previous time step over the whole leapfrog interval
+``2\Delta t`` and adds the mean tendency, so the vertical advection is effectively operator-split from the other tendencies.
+
 ### Vertical velocity
 
 In the section [Surface pressure tendency](@ref) we used that the surface pressure changes

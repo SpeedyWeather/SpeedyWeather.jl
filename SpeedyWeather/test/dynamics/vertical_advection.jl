@@ -48,6 +48,7 @@ end
         SpeedyWeather.WENOVerticalAdvection,
         SpeedyWeather.CenteredVerticalAdvection,
         SpeedyWeather.UpwindVerticalAdvection,
+        SpeedyWeather.SubcycledVerticalAdvection,
     )
 
     for VerticalAdvection in advection_schemes
@@ -75,6 +76,7 @@ end
         SpeedyWeather.CenteredVerticalAdvection,
         SpeedyWeather.UpwindVerticalAdvection,
         SpeedyWeather.WENOVerticalAdvection,
+        SpeedyWeather.SubcycledVerticalAdvection,
     )
 
     for VerticalAdvection in advection_schemes
@@ -108,4 +110,64 @@ end
         ).data
         @test tendency_changed_profile ≈ tendency .- profile_change' .* divergence
     end
+end
+
+@testset "Subcycled vertical advection" begin
+    # columns all alike: compare with WENO for small Courant numbers, stay bounded for large ones
+    nlayers = 40
+    spectral_grid = SpectralGrid(truncation = 5; nlayers, NF = Float64)
+    Δσ = fill(1 / nlayers, nlayers)
+
+    # constructors and options
+    sub = SubcycledVerticalAdvection(spectral_grid; substeps = 64)
+    @test sub isa SpeedyWeather.DiffusiveVerticalAdvection{Float64, 3}
+    @test sub.scheme isa WENOVerticalAdvection
+    @test occursin("WENOVerticalAdvection", sprint(show, sub))
+    fixed = SubcycledVerticalAdvection(spectral_grid; courant_target = nothing, substeps = 10)
+    adaptive = SubcycledVerticalAdvection(spectral_grid; courant_target = 1, substeps = 64)
+    upwind3 = SubcycledVerticalAdvection(spectral_grid; scheme = UpwindVerticalAdvection(spectral_grid; order = 3), substeps = 64)
+    @test upwind3 isa SpeedyWeather.DiffusiveVerticalAdvection{Float64, 2}
+    @test_throws ArgumentError SubcycledVerticalAdvection(spectral_grid; substeps = 0)
+    weno = WENOVerticalAdvection(spectral_grid)
+
+    # the Runge-Kutta stages use scratch variables declared by the scheme
+    model = PrimitiveDryModel(spectral_grid; vertical_advection = sub)
+    simulation = initialize!(model)
+    vars = simulation.variables
+    @test haskey(vars.scratch.grid, :c)
+
+    bump = [exp(-((k - 15) / 4)^2) for k in 1:nlayers]          # Gaussian bump
+    ξ = zero(vars.grid.temperature)                              # with step dimension, step 1 is advected
+    ξ.data[:, :, 1] .= bump'
+    w = zero(vars.dynamics.w)
+    w.data[:, 1:(nlayers - 1)] .= 1.0e-4                         # uniform descent (σ increasing), w = 0 at the surface
+
+    function tendency(adv, interval)
+        ξ_tend = zero(ξ)
+        SpeedyWeather._vertical_advection!(ξ_tend, 1, w, ξ, 1, Δσ, adv, interval, vars.scratch)
+        @test all(ξ_tend.data[:, :, 1] .== ξ_tend.data[1:1, :, 1])   # all columns alike
+        return ξ_tend.data[1, :, 1]
+    end
+
+    # tiny interval: one substep, SSP-RK3 converges to the instantaneous WENO tendency
+    @test tendency(sub, 1.0e-3) ≈ tendency(weno, 1.0e-3) rtol = 1.0e-3
+
+    # Courant number 9.5 over the interval (bump moves ~9.5 layers, away from the boundaries):
+    # stays finite and bounded to within 1 % (WENO is not strictly monotone)
+    interval = 9.5 * Δσ[1] / 1.0e-4
+    for adv in (sub, upwind3)
+        ξ_end = bump .+ interval .* tendency(adv, interval)
+        @test all(isfinite, ξ_end)
+        @test maximum(ξ_end) <= maximum(bump) + 1.0e-2
+        @test minimum(ξ_end) >= -1.0e-2
+        @test argmax(ξ_end) - argmax(bump) in 8:11              # the bump moved down (towards larger σ)
+    end
+
+    # 10 fixed substeps are the same as the adaptive ceil(9.5 / 1) = 10 substeps
+    @test tendency(fixed, interval) ≈ tendency(adaptive, interval)
+
+    # the interval of the current time step is taken from the time stepper and the clock
+    @test SpeedyWeather.advection_interval(sub, vars, model) ≈
+        SpeedyWeather.time_step(model.time_stepping, vars.prognostic.clock) / model.planet.radius
+    @test isnothing(SpeedyWeather.advection_interval(weno, vars, model))
 end
