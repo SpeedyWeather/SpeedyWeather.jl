@@ -302,7 +302,7 @@ end
 # the clock passes Δt/2 on the 1st Euler step and on the 2nd leapfrog step (Δt but rewinds Δt/2),
 # then Δt on every later step, see `time_step!(::Clock, ::Leapfrog)`
 clock_increment(L::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, L.Δt / 2, L.Δt)
-      
+
 """$(TYPEDSIGNATURES)
 Wiener scaling `1/√Δt` (see `AdditiveWienerNoise`) for a leapfrog step, `Δt` is half its time
 step: a leapfrog step of 2Δt advances each of its two interleaved sequences by 2Δt, but the clock
