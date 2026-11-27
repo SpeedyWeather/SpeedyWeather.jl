@@ -6,8 +6,14 @@ export BettsMillerConvection
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct BettsMillerConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
-    "[OPTION] Relaxation time for profile adjustment"
+    "[OPTION] Relaxation time for profile adjustment (at T32 if `resolution_scaling`)"
     time_scale::Second = Hour(4)
+
+    "[OPTION] Shorten the relaxation time with resolution, `time_scale × 32/truncation`? Otherwise constant"
+    resolution_scaling::Bool = true
+
+    "Spectral truncation the relaxation time is scaled with, set from the SpectralGrid"
+    truncation::Int = 32
 
     "[OPTION] Relative humidity for reference profile [1]"
     @param relative_humidity::NF = 0.7
@@ -26,7 +32,16 @@ Adapt.@adapt_structure BettsMillerConvection
 
 # generator function
 BettsMillerConvection(SG::SpectralGrid; entrainment = LinearEntrainment(SG), kwargs...) =
-    BettsMillerConvection{SG.NF, typeof(entrainment)}(; entrainment, kwargs...)
+    BettsMillerConvection{SG.NF, typeof(entrainment)}(; entrainment, truncation = SG.truncation, kwargs...)
+
+"""$(TYPEDSIGNATURES)
+Relaxation time [s] of the Betts-Miller scheme, `time_scale × 32/truncation` with `resolution_scaling = true`
+(the default, following the resolution scaling of the horizontal diffusion), `time_scale` otherwise."""
+function relaxation_time(convection::BettsMillerConvection{NF}) where {NF}
+    (; time_scale, resolution_scaling, truncation) = convection
+    scaling = ifelse(resolution_scaling, NF(32) / truncation, one(NF))
+    return convert(NF, Second(time_scale).value) * scaling
+end
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -128,7 +143,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # arrays) as temp_ref_profile/humid_ref_profile only hold the *uncorrected* adiabat; the
     # correction is masked to the in-column range so levels above LZB stay exactly at the
     # environment and contribute exact zero, full-range and branchless
-    τ⁻¹ = inv(convert(NF, Second(convection.time_scale).value))
+    τ⁻¹ = inv(relaxation_time(convection))
     for k in 1:nlayers
         in_column = k >= level_zero_buoyancy
         T_ref = temp_ref_profile[ij, k] - ifelse(in_column, ΔT, zero(NF))    # eq (6) / (15)
