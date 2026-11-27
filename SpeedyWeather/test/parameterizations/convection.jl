@@ -66,6 +66,20 @@
                 @test ce(σ) ≈ NF(0.3)
             end
             @test (@inferred ce(NF(0.5))) isa NF
+
+            # mixed fraction over a σ distance, independent of the number of layers, see #1426
+            Δσ_ref = ce.reference_layer_thickness
+            @test ce(NF(0.5), Δσ_ref) ≈ NF(0.3)             # reference distance: entrainment_rate
+            @test ne(NF(0.5), NF(0.1)) == 0
+            @test ce(NF(0.5), NF(0)) == 0                   # no distance: no mixing
+            @test (@inferred ce(NF(0.5), NF(0.1))) isa NF
+            # n thin layers dilute as much as one thick layer
+            for n in (2, 8, 100)
+                remaining_thin = (1 - ce(NF(0.5), Δσ_ref / n))^n
+                @test remaining_thin ≈ 1 - ce(NF(0.5), Δσ_ref)
+            end
+            @test le(NF(1), Δσ_ref) ≈ NF(0.8)
+            @test le(NF(0.4), NF(0.1)) == 0                 # above σ_entrainment: zero
         end
     end
 
