@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `DiagnosticClouds(humidity_smoothing = HumiditySmoothing(spectral_grid, thickness = 1/8))` averages relative humidity over a fixed σ window before taking its free-tropospheric maximum, so that cloud cover does not increase with the number of layers (default `NoHumiditySmoothing()`, unchanged) [#1435](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1435)
 - Saturation vapor pressure formulations `ClausiusClapeyronConstantL` (previous default), `ClausiusClapeyronLinearL` (Romps 2017), `IFSMixedPhase` (new default, with ice phase) and `MagnusBolton`, each with analytical derivative `grad`, chosen via `EarthAtmosphere(spectral_grid; saturation)`; field `EarthAtmosphere.saturation_vapor_pressure` moved into `ClausiusClapeyronConstantL.e₀`, unused `TetensEquation` removed (superseded by `MagnusBolton` and `IFSMixedPhase`); `ImplicitCondensation` uses the derivative of the chosen formulation via `grad_saturation_humidity` [#1441](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1441)
 - Entrainment in Betts-Miller convection as a rate per unit σ so parcel dilution is independent of the number of layers, new parameter `reference_layer_thickness` [#1429](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1429)
 - `BettsMillerConvection` shortens the relaxation time with resolution by default, `time_scale × 32/truncation` (4 hours at T32, 1 hour at T128), `resolution_scaling = false` for a constant `time_scale` [#1444](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1444)
