@@ -102,6 +102,14 @@ Base revision: 20467269399f40212fee413a545496226de999ca
   -0.02 of its σ thickness), the ramp keeps them apart (0.46). Created with `hybrid-sigma-pressure-levels.jl`
   (`julia --project=SpeedyWeather/test`).
 
+  ![Level lines over the Palmer Ridge](palmer-ridge-levels.png)
+  The same for the 10 km "Palmer Ridge" stress test (9.7 km crest, ≈ 277 hPa, full width at half
+  maximum 2Δx ≈ 417 km at T64, L31, standard-atmosphere surface pressure): σ, the default ramp
+  (`pressure_only_above = 0.2, ramp_width = 0.3`) and a higher-starting ramp (0.05, 0.2). With the
+  default ramp the levels cross over the ridge (thinnest layer -0.41 of its σ thickness, crossing
+  interfaces in red), the higher-starting ramp keeps them apart (0.54). Created with
+  `palmer-ridge-levels.jl`.
+
 > Feel free to adjust this transition. This was originally implemented as a draft just to show how the
 > transition could be done. As long as the Frierson idea of having thinner layers towards the surface
 > remains (the B part) you have freedom
@@ -123,6 +131,9 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 
 > Can you already merge in 1381 as that changes the way how the geopotential is calculated and
 > hopefully makes this PR simpler?
+- 2026-11-27: merged main (BulkRichardsonDiffusion rewrite taken from main, which is already
+  pressure-based; entrainment over Δ(p/pₛ) via `pressure_ratio`; shortwave aerosol factor
+  (p/pₛ)² instead of nominal σ²); added the Palmer Ridge level-line figure.
 
 ## Problem description
 
