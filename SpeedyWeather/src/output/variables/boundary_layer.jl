@@ -189,6 +189,24 @@ end
 path(::HumidityBoundaryLayerDrag, simulation) =
     simulation.variables.parameterizations.boundary_layer_drag_humidity
 
+"""Defines netCDF output of the boundary layer height above the surface, diagnosed by the
+vertical diffusion (`BulkRichardsonDiffusion`) where the bulk Richardson number relative to the
+lowermost layer reaches its critical value. See [`Vorticity`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct BoundaryLayerHeight <: AbstractOutputVariable
+    name::String = "blh"
+    unit::String = "m"
+    long_name::String = "Boundary layer height above the surface"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::BoundaryLayerHeight, simulation) =
+    simulation.variables.parameterizations.boundary_layer_height
+
 """Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct MomentumSurfaceRoughness <: AbstractOutputVariable
@@ -236,6 +254,7 @@ BoundaryLayer() = (
     ZonalVelocity10m(),
     MeridionalVelocity10m(),
     SurfaceTemperature(),
+    BoundaryLayerHeight(),
     BoundaryLayerDrag()...,
     SurfaceRoughness()...,
 )

@@ -128,6 +128,7 @@ include("variables/abstract_types.jl")
 include("models/abstract_models.jl")
 include("parameterizations/abstract_types.jl")
 include("time_stepping/abstract_types.jl")
+include("time_stepping/relaxation_integration.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/spectral_grid.jl")
@@ -135,6 +136,7 @@ include("dynamics/vertical_coordinates.jl")
 include("dynamics/geometry.jl")
 include("dynamics/coriolis.jl")
 include("dynamics/planet.jl")
+include("parameterizations/thermodynamics.jl")   # before atmosphere: default saturation vapor pressure
 include("dynamics/atmosphere.jl")
 include("dynamics/adiabatic_conversion.jl")
 include("dynamics/orography.jl")

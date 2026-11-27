@@ -80,7 +80,6 @@ large-scale precipitation vertically for output."""
     Lᵥ = atmosphere.latent_heat_condensation            # latent heat of vaporization
     Lᵢ = atmosphere.latent_heat_fusion                  # latent heat of fusion
     cₚ = atmosphere.heat_capacity                       # heat capacity
-    Rᵥ = atmosphere.R_vapor                             # gas constant for water vapor
     Lᵥ_cₚ = Lᵥ / cₚ
     Lᵢ_cₚ = Lᵢ / cₚ
     cₚ_Lᵢ = cₚ / Lᵢ
@@ -120,8 +119,8 @@ large-scale precipitation vertically for output."""
             # don't use δq_melt as humidity tendency as it's only snow->rain
 
             sat_humid_k_melted = saturation_humidity(T, pₖ, atmosphere) # update saturation humidity post snow melting
-            # derivative of qsat wrt temp
-            dqsat_dT = sat_humid_k_melted * Lᵥ / (Rᵥ * T^2)    # Clausius-Clapeyron [1/K]
+            # derivative of qsat wrt temp, consistent with the saturation vapor pressure formulation
+            dqsat_dT = grad_saturation_humidity(T, pₖ, atmosphere)  # [1/K]
 
             # 2. Reevaporation and condensation
             dq = sat_humid_k_melted - humid[ij, k]                # reevaporation relative to 100% humidity

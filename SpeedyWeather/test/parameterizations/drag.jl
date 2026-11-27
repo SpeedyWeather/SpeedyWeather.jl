@@ -64,12 +64,12 @@ end
         @test land_drag ≈ C_land
         @test ocean_drag ≈ C_ocean
 
-        # surface colder than the air: stable (0 < Ri < Ri_c), reduced transfer coefficient
+        # surface colder than the air: stable (0 < Ri < Ri_cutoff), reduced transfer coefficient
         land_drag, ocean_drag = heat_drag(-10, 10)
         @test all(drag_min .< land_drag .< C_land)
         @test all(drag_min .< ocean_drag .< C_ocean)
 
-        # surface much colder than the air at weak wind: strongly stable (Ri ≥ Ri_c), minimum drag
+        # surface much colder than the air at weak wind: strongly stable (Ri ≥ Ri_cutoff), minimum drag
         land_drag, ocean_drag = heat_drag(-20, 0.5)
         @test all(==(drag_min), land_drag)
         @test all(==(drag_min), ocean_drag)

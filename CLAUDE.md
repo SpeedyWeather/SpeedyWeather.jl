@@ -347,6 +347,17 @@ use `ifelse(cond, a, b)`, `min`, `max` or `clamp` instead of `if`, `? :`, `&&`, 
 
 To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. Guard numerator and denominator separately, `ifelse(c, x, 0) / ifelse(c, y, 1)`, never with a nested `ifelse(c, x / ifelse(c, y, 1), 0)`: LLVM removes the inner `ifelse` because `c` is known to be true in the taken branch, leaving an unguarded `x / y`.
 
+### Number format conversions with Reactant
+
+Under Reactant, scalars can be traced (`TracedRNumber{Float32}`). `convert` to a *traced* type works
+(`convert(TracedRNumber{Float32}, 1.0f0)`), but `convert` (or `Float32(x)`, `oftype`) from a traced
+number to a *plain* number type has no method: `convert(Float32, x::TracedRNumber{Float32})` fails.
+Model parameters are usually plain numbers, so `convert(typeof(parameter), x)` breaks once `x` is traced.
+Promotion (`promote`, or plain arithmetic) always works but widens, so the input (e.g. a Float64)
+would decide the precision. To make the component's number format `NF` win, use
+`convert_number_format(NF, x)`: `convert` on CPU/GPU, only the element type for a traced `x`.
+Inside `@kernel`s values are plain numbers, so the issue arises in broadcasts and `set!` functions.
+
 ## Benchmarks
 
 Benchmarks live in `SpeedyWeather/benchmark/`. Run the full suite with:

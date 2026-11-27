@@ -1,3 +1,7 @@
+# a function of three arguments that is compiled and not dynamically generated, for `static_func = true`
+# use cos(deg2rad(x)) not cosd(x): Base's Float32 sind/cosd compute in Float64, unsupported on Metal
+static_test_function(λ, φ, η) = cos(deg2rad(φ)) * (1 - η) + sin(deg2rad(λ)) / 10
+
 @testset "set! functions on GPU" begin
 
     # 3D
@@ -10,9 +14,7 @@
 
     @test field[1, :] ≈ (1.0f0 .- geometry.σ_levels_full)
 
-    # zfac is just a pretty random function from Speedy with three input
-    # arguments, that's compiled and not dynamically generated
-    set!(field, SpeedyWeather.zfac, geometry; static_func = true)
+    set!(field, static_test_function, geometry; static_func = true)
 
     # just compare to CPU version
     architecture_cpu = SpeedyWeather.CPU()
@@ -20,7 +22,7 @@
     geometry_cpu = Geometry(spectral_grid_cpu)
     field_cpu = zeros(Float32, spectral_grid_cpu.grid, 8)
 
-    set!(field_cpu, SpeedyWeather.zfac, geometry_cpu)
+    set!(field_cpu, static_test_function, geometry_cpu)
 
     @test field_cpu ≈ on_architecture(architecture_cpu, field)
 

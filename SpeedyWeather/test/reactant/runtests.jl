@@ -1,8 +1,25 @@
 """
-Test scripts running SpeedyWeather with Reactant.
+Test scripts running SpeedyWeather with Reactant, in two groups that CI runs as separate jobs:
+
+- `unit`: single features on Reactant (`@maybe_jit`, transforms, interpolation, output, restart files,
+  compiled time loops, the implicit solver, differentiation)
+- `correctness`: whole models on Reactant against the CPU (`test_correctness.jl`), their tendencies
+  after one time step and their state after `NSTEPS` time steps
+
+Run from the repository root with the groups to run as arguments, all groups without:
+
+    julia --project=SpeedyWeather/test/reactant SpeedyWeather/test/reactant/runtests.jl unit
+    julia --project=SpeedyWeather/test/reactant SpeedyWeather/test/reactant/runtests.jl correctness
 """
 
 cd("SpeedyWeather/test/reactant")
+
+const TEST_GROUPS = ("unit", "correctness")
+const GROUPS = isempty(ARGS) ? TEST_GROUPS : Tuple(ARGS)
+for group in GROUPS
+    group in TEST_GROUPS || error("Unknown Reactant test group \"$group\", choose from $TEST_GROUPS")
+end
+
 import Pkg
 Pkg.activate(@__DIR__)
 
@@ -48,16 +65,22 @@ const PRIMITIVE_TOLERANCES = (
 correctness_tolerances(::Type{<:Union{BarotropicModel, ShallowWaterModel}}) = ONE_LAYER_TOLERANCES
 correctness_tolerances(::Type{<:Union{PrimitiveDryModel, PrimitiveWetModel}}) = PRIMITIVE_TOLERANCES
 
-include("test_maybe_jit.jl")
-include("utilities.jl")
 include("setup.jl")
-include("test_transform.jl")
-include("test_interpolation.jl")
-include("test_correctness.jl")
-include("test_output.jl")
-include("test_restart.jl")
-include("test_time_steps.jl")
-include("test_implicit.jl")
-include("test_drag.jl")
 
-include("differentation.jl")
+if "unit" in GROUPS
+    include("test_maybe_jit.jl")
+    include("utilities.jl")
+    include("test_transform.jl")
+    include("test_interpolation.jl")
+    include("test_output.jl")
+    include("test_restart.jl")
+    include("test_time_steps.jl")
+    include("test_implicit.jl")
+    include("test_drag.jl")
+    include("test_thermodynamics.jl")
+    include("differentation.jl")
+end
+
+if "correctness" in GROUPS
+    include("test_correctness.jl")
+end

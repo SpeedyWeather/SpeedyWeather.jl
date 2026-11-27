@@ -81,11 +81,11 @@ end
     @test heating ≈ Lᵥ * net_condensation + Lᵢ * snow_surface rtol = 1.0e-10
 
     # implicit correction in the top layer (no incoming precipitation), Frierson et al. 2006 eq. (21)
-    # with Clausius-Clapeyron dqsat/dT = qsat Lᵥ / (Rᵥ T²) [1/K]
+    # with dqsat/dT [1/K] from the saturation vapor pressure formulation of the atmosphere
     (; relative_humidity_threshold, time_scale) = condensation
     p₁ = SpeedyWeather.pressure(1, surface_pressure, coord)
     sat_humid = SpeedyWeather.saturation_humidity(temp[ij, 1], p₁, atmosphere)
-    dqsat_dT = relative_humidity_threshold * sat_humid * Lᵥ / (atmosphere.R_vapor * temp[ij, 1]^2)
+    dqsat_dT = relative_humidity_threshold * SpeedyWeather.grad_saturation_humidity(temp[ij, 1], p₁, atmosphere)
     δq_cond = relative_humidity_threshold * sat_humid - humid[ij, 1]
     @test humid_tend[ij, 1] ≈ δq_cond / ((1 + Lᵥ / cₚ * dqsat_dT) * time_scale * time_stepping.Δt)
 end
