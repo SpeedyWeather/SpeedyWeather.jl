@@ -26,6 +26,23 @@
         end
     end
 
+    @testset "Betts-Miller relaxation time resolution scaling" begin
+        for truncation in (32, 64, 128)
+            SG = SpectralGrid(; truncation, nlayers = 8)
+            @test SpeedyWeather.relaxation_time(BettsMillerConvection(SG)) ≈ 4 * 3600 * 32 / truncation  # default: scaled
+            convection = BettsMillerConvection(SG; resolution_scaling = false)
+            @test SpeedyWeather.relaxation_time(convection) == 4 * 3600                                 # constant
+        end
+
+        # runs with the scaling off
+        convection = BettsMillerConvection(spectral_grid; resolution_scaling = false)
+        model = PrimitiveWetModel(spectral_grid; convection)
+        model.feedback.verbose = false
+        simulation = initialize!(model)
+        run!(simulation, steps = 36)
+        @test all(isfinite, simulation.variables.prognostic.temperature)
+    end
+
     @testset "Entrainment functors" begin
         for NF in (Float32, Float64)
             ne = NoEntrainment()
@@ -49,6 +66,20 @@
                 @test ce(σ) ≈ NF(0.3)
             end
             @test (@inferred ce(NF(0.5))) isa NF
+
+            # mixed fraction over a σ distance, independent of the number of layers, see #1426
+            Δσ_ref = ce.reference_layer_thickness
+            @test ce(NF(0.5), Δσ_ref) ≈ NF(0.3)             # reference distance: entrainment_rate
+            @test ne(NF(0.5), NF(0.1)) == 0
+            @test ce(NF(0.5), NF(0)) == 0                   # no distance: no mixing
+            @test (@inferred ce(NF(0.5), NF(0.1))) isa NF
+            # n thin layers dilute as much as one thick layer
+            for n in (2, 8, 100)
+                remaining_thin = (1 - ce(NF(0.5), Δσ_ref / n))^n
+                @test remaining_thin ≈ 1 - ce(NF(0.5), Δσ_ref)
+            end
+            @test le(NF(1), Δσ_ref) ≈ NF(0.8)
+            @test le(NF(0.4), NF(0.1)) == 0                 # above σ_entrainment: zero
         end
     end
 

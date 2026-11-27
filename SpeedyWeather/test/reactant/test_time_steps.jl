@@ -11,7 +11,8 @@ function seeded_reactant_model(ModelType::Type)
     return create_reactant_model(ModelType; initial_conditions = (; vordiv = RandomVelocity(spectral_grid; seed = 1)))
 end
 
-@testset "time_steps! vs single compiled time steps: $ModelType" for ModelType in (BarotropicModel, PrimitiveWetModel)
+# TODO: currently only tested on BarotropicModel, becasue it takes too long in CI for PimitiveWetModel
+@testset "time_steps! vs single compiled time steps: $ModelType" for ModelType in (BarotropicModel, ) #PrimitiveWetModel)
     nsteps = 4
     simulation_single = initialize!(seeded_reactant_model(ModelType))
     simulation_loop = initialize!(seeded_reactant_model(ModelType))

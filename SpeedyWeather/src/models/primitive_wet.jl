@@ -88,7 +88,7 @@ $(TYPEDFIELDS)"""
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
-    @component vertical_diffusion::VD = nothing    # TODO overhaul BulkRichardsonDiffusion
+    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
@@ -123,11 +123,11 @@ $(TYPEDFIELDS)"""
     )
     parameterizations::TS2 = (
         :solar_zenith,              # external forcing
-        :vertical_diffusion,        # mixing and precipitation
         :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
         :surface_humidity_flux,
+        :vertical_diffusion,        # mixing, after the surface fluxes to spread them
         :large_scale_condensation,
         :convection,
         :albedo,                    # radiation
