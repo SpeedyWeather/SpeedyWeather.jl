@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Entrainment in Betts-Miller convection as a rate per unit σ so parcel dilution is independent of the number of layers, new parameter `reference_layer_thickness` [#1429](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1429)
 - `BettsMillerConvection` shortens the relaxation time with resolution by default, `time_scale × 32/truncation` (4 hours at T32, 1 hour at T128), `resolution_scaling = false` for a constant `time_scale` [#1444](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1444)
 - `BulkRichardsonDiffusion` reimplemented: diffusion as a flux divergence on pressure thicknesses in physical units, implicit (backward Euler) time integration that also spreads the surface fluxes over the column, diffusivity from a Frierson boundary-layer profile (height above ground, surface temperatures, drag of the boundary layer, `critical_Richardson = 1`), a local Louis/Holtslag-Boville diffusivity and a background diffusivity; called after the surface fluxes. [#1422](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1422)
 - `SpeedLimitDrag` is time integrated with a damping factor `time_integration` (`ImplicitFluxes()` by default, exact for the quadratic drag; also `RationalFluxes()`, `ExponentialFluxes()`, `ExplicitFluxes()`) and evaluated at the previous leapfrog step, so that it never decelerates the wind beyond the speed limit; default `drag` raised 3e-6 -> 1e-5 [#1422](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1422)
