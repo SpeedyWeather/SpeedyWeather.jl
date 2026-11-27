@@ -29,7 +29,7 @@ initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
     pₛ = vars.parameterizations.surface_pressure[ij]
 
     for k in 1:nlayers
-        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        Δσₖ = pressure_thickness_ratio(k, pₛ, coord)
         t[ij, k] = exp(-τ * Δσₖ)            # transmissivity through layer k
     end
     return t
@@ -117,7 +117,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
         q = humid[ij, k]
 
         # Aerosol factor: use mid-level sigma, squared (aerosol loading increases toward surface)
-        aerosol_factor = ifelse(transmissivity.aerosols, sigma(k, coord)^2, zero(NF))
+        aerosol_factor = ifelse(transmissivity.aerosols, pressure_ratio(k, pₛ, coord)^2, zero(NF))
 
         # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
         layer_absorptivity = (
@@ -131,7 +131,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
         # Compute differential optical depth with zenith correction
         # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
-        Δσₖ = pressure_thickness(k, pₛ, coord) / pₛ
+        Δσₖ = pressure_thickness_ratio(k, pₛ, coord)
         optical_depth = layer_absorptivity * Δσₖ * normalized_surface_pressure * zenith_factor
 
         # Transmissivity through layer k
@@ -222,7 +222,7 @@ the lowest layer above the boundary layer. Returns a NamedTuple `(; visible, nea
 
     for k in 1:nlayers
         q = humid[ij, k]
-        aerosol_factor = ifelse(transmissivity.aerosols, sigma(k, coord)^2, zero(NF))
+        aerosol_factor = ifelse(transmissivity.aerosols, pressure_ratio(k, pₛ, coord)^2, zero(NF))
 
         absorptivity_visible = transmissivity.absorptivity_dry_air +
             transmissivity.absorptivity_aerosol * aerosol_factor +

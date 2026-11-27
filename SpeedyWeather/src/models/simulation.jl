@@ -89,6 +89,9 @@ function initialize!(
     @maybe_jit model.architecture transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays
 
+    # error if hybrid sigma-pressure layers cross over the lowest surface pressure (high orography)
+    check_layer_thickness(variables, model)
+
     # OUTPUT, CALLBACKS, FEEDBACK only initialize output and callbacks now, just before the simulation starts
     set!(simulation.model.output, active = output, reset_path = true)
     initialize!(model.output, variables, model)
@@ -109,3 +112,14 @@ function finalize!(simulation::AbstractSimulation)
     synchronize(model.architecture)                 # synchronize the device in the end (e.g. for benchmarks)
     return simulation
 end
+
+"""$(TYPEDSIGNATURES)
+Check the vertical coordinates of `model` for crossing layers given the range of the
+surface pressure in `vars`, see `check_layer_thickness(coordinate, pₛ_min, pₛ_max)`."""
+function check_layer_thickness(vars::Variables, model::PrimitiveEquation)
+    log_surface_pressure = on_architecture(CPU(), vars.grid.pressure)
+    log_pₛ_min, log_pₛ_max = extrema(log_surface_pressure)
+    return check_layer_thickness(model.geometry.vertical_coordinates, exp(log_pₛ_min), exp(log_pₛ_max))
+end
+
+check_layer_thickness(::Variables, ::AbstractModel) = nothing
