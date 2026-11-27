@@ -93,9 +93,21 @@ initialize!(::BulkRichardsonDiffusion, ::PrimitiveEquation) = nothing
 # To enable both the parameterization is written for ranges of columns with the GPU just always passing a range
 # of one column.
 
-# One column of the fused kernel (GPU, Reactant) is the range ij:ij, for which the inner loops have one iteration
+"""Helper tool for GPU/Reactant. The single column `ij` as a range of columns whose length of one is known at compile
+time, so that every loop over it compiles to straight-line code without run-time bounds."""
+struct SingleColumn{T <: Integer} <: AbstractUnitRange{T}
+    ij::T
+end
+
+Base.first(column::SingleColumn) = column.ij
+Base.last(column::SingleColumn) = column.ij
+Base.length(::SingleColumn) = 1
+Base.iterate(column::SingleColumn) = (column.ij, nothing)
+Base.iterate(::SingleColumn, ::Nothing) = nothing
+
+# One column of the fused kernel (GPU, Reactant), for which the inner loops have one iteration
 @propagate_inbounds parameterization!(ij, vars, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij:ij, vars, diffusion, model)
+    vertical_diffusion!(SingleColumn(ij), vars, diffusion, model)
 
 # On CPU all columns at once
 @inline function column_parameterization_cpu!(vars, diffusion::BulkRichardsonDiffusion, model)
