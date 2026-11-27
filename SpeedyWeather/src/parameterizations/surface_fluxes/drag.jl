@@ -55,8 +55,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] von Kármán constant [1]"
     @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
-    "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    @param critical_Richardson::NF = 10 (bounds = Positive,)
+    "[OPTION] Bulk Richardson number at and above which the drag is minimal (stable mixing cutoff) [1]"
+    @param Richardson_cutoff::NF = 10 (bounds = Positive,)
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     @param drag_min::NF = 1.0e-5 (bounds = Nonnegative,)
@@ -65,6 +65,13 @@ end
 Adapt.@adapt_structure BulkRichardsonDrag
 BulkRichardsonDrag(SG::SpectralGrid; kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
+
+# additionally the bulk Richardson number that the drag is computed from, for parameterizations called
+# afterwards that need it too (`BulkRichardsonDiffusion`) and would otherwise compute it again
+variables(drag::BulkRichardsonDrag) = (
+    invoke(variables, Tuple{AbstractBoundaryLayerDrag}, drag)...,
+    ParameterizationVariable(:surface_bulk_richardson, GridXY(), desc = "Bulk Richardson number between the surface and the lowermost layer", units = "1"),
+)
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, boundary_layer, model) =
@@ -108,15 +115,16 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # they call it Ri_a = Ri_land/Ri_ocean here
     ΔΦ₀ = gravity * z     # geopotential height relative to surface
     Ri_land, Ri_ocean = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
-    Ri_c = drag.critical_Richardson
+    vars.parameterizations.surface_bulk_richardson[ij] = land_fraction * Ri_land + (1 - land_fraction) * Ri_ocean
+    Ri_cutoff = drag.Richardson_cutoff
     (; drag_min) = drag
 
-    # clamp to get the cases, eq (12-14)
-    # if Ri > Ri_c then C = 0
-    # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
+    # clamp to get the cases, eq (12-14), with a cutoff instead of Frierson's critical Richardson number
+    # if Ri > Ri_cutoff then C = 0
+    # if Ri_cutoff > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_cutoff)^2
     # if Ri < 0 then κ^2/log(z/z₀)^2
-    stability_land = (1 - clamp(Ri_land, 0, Ri_c) / Ri_c)^2
-    stability_ocean = (1 - clamp(Ri_ocean, 0, Ri_c) / Ri_c)^2
+    stability_land = (1 - clamp(Ri_land, 0, Ri_cutoff) / Ri_cutoff)^2
+    stability_ocean = (1 - clamp(Ri_ocean, 0, Ri_cutoff) / Ri_cutoff)^2
 
     # unpack for readability
     (; land, ocean) = vars.parameterizations

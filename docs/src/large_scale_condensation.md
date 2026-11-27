@@ -124,7 +124,9 @@ as follows
 \left[ 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]},
 ```
 where ``r`` is a linear scale and therefore can be taken out of the gradient
-``\frac{\partial q^\star}{\partial T}`` in the denominator.
+``\frac{\partial q^\star}{\partial T}`` in the denominator. This gradient is computed
+analytically from the chosen [Saturation vapor pressure](@ref) formulation
+(`model.atmosphere.saturation`), so the implicit correction is consistent with ``q^\star``.
 
 ## Re-evaporation
 

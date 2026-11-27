@@ -149,6 +149,13 @@ environmental temperature ``T`` and specific humidity ``q`` in the column
 ```
 
 with the second parameter of the parameterization, the time scale ``\tau_{SBM}``.
+By default (`resolution_scaling = true`) ``\tau_{SBM}`` is shortened in proportion to the grid spacing,
+``\tau_{SBM} = `` `time_scale` ``\cdot 32/T`` for truncation ``T``, as for the
+[horizontal diffusion](@ref diffusion): with the default `time_scale` of 4 hours, ``\tau_{SBM}`` is 4 hours at T32,
+2 hours at T64, 1 hour at T128 and 15 minutes at T512. At higher resolution the resolved ascent removes instability
+faster, so a fixed 4 hours lets the large-scale condensation take over the tropical rain. Use
+`BettsMillerConvection(spectral_grid; resolution_scaling = false)` for ``\tau_{SBM}`` = `time_scale`
+at all resolutions.
 Note that because this is a first-guess relaxation, these tendencies are not actually
 the resulting tendencies from this scheme. Those will be calculated in [Corrected relaxation](@ref).
 
