@@ -26,6 +26,23 @@
         end
     end
 
+    @testset "Betts-Miller relaxation time resolution scaling" begin
+        for truncation in (32, 64, 128)
+            SG = SpectralGrid(; truncation, nlayers = 8)
+            @test SpeedyWeather.relaxation_time(BettsMillerConvection(SG)) ≈ 4 * 3600 * 32 / truncation  # default: scaled
+            convection = BettsMillerConvection(SG; resolution_scaling = false)
+            @test SpeedyWeather.relaxation_time(convection) == 4 * 3600                                 # constant
+        end
+
+        # runs with the scaling off
+        convection = BettsMillerConvection(spectral_grid; resolution_scaling = false)
+        model = PrimitiveWetModel(spectral_grid; convection)
+        model.feedback.verbose = false
+        simulation = initialize!(model)
+        run!(simulation, steps = 36)
+        @test all(isfinite, simulation.variables.prognostic.temperature)
+    end
+
     @testset "Entrainment functors" begin
         for NF in (Float32, Float64)
             ne = NoEntrainment()
