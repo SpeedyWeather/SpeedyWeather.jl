@@ -20,7 +20,7 @@ function grid_tendencies!(vars::Variables, model::PrimitiveEquation)
     vordiv_grid_tendencies!(vars, model)             # u_tend_grid, v_tend_grid
     temperature_grid_tendency!(vars, model)          # temp_tend_grid + uT_anomaly_grid, vT_anomaly_grid
     humidity_grid_tendency!(vars, model)             # humid_tend_grid + uq_grid, vq_grid (no-op for dry)
-    bernoulli_grid_potential!(vars, model, model.time_stepping)           # kinetic_energy_grid = ½(u²+v²)
+    bernoulli_grid_potential!(vars, model, model.time_stepping)           # kinetic_energy_grid = ½(u²+v²)+Φ-Φ̄ₖ-Φₛ
     surface_pressure_grid_tendency!(vars, model)     # pres_tend_grid += (ū,v̄)·∇lnpₛ
     return nothing
 end
@@ -48,6 +48,7 @@ function spectral_tendencies!(vars::Variables, model::PrimitiveEquation)
     temperature_spectral_tendency!(vars, model)
     humidity_spectral_tendency!(vars, model)         # no-op for PrimitiveDry
     linear_pressure_gradient!(vars, model)           # Bernoulli potential += R*Tₖ*lnpₛ
+    bernoulli_surface_geopotential!(vars, model)     # Bernoulli potential += Φₛ
     bernoulli_spectral_potential!(vars, model)
     surface_pressure_spectral_tendency!(vars, model)
     return nothing
@@ -1157,15 +1158,49 @@ function bernoulli_grid_potential!(vars::Variables, model::ShallowWater, time_st
 end
 
 """$(TYPEDSIGNATURES)
-Gridded contribution of `bernoulli_potential!` for PrimitiveEquation: writes `kinetic_energy_grid = ½(u²+v²)+Φ`
-with the grid-point geopotential Φ calculated in `transform!`, shared with the parameterizations."""
-function bernoulli_grid_potential!(vars::Variables, ::Union{PrimitiveEquation, AbstractSpectralTransform}, time_stepping::AbstractTimeStepper)
+Gridded contribution of `bernoulli_potential!`: writes `kinetic_energy_grid = ½(u²+v²)+Φ`
+with the grid-point geopotential Φ calculated in `transform!`."""
+function bernoulli_grid_potential!(vars::Variables, ::AbstractSpectralTransform, time_stepping::AbstractTimeStepper)
     u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     Φ = vars.dynamics.geopotential
     bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
     half = convert(eltype(bernoulli_grid), 0.5)
     @. bernoulli_grid = half * (u^2 + v^2) + Φ
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Gridded contribution of the Bernoulli potential for PrimitiveEquation: writes
+`kinetic_energy_grid = ½(u²+v²) + (Φ - Φ̄ₖ) - Φₛ` with the grid-point geopotential Φ calculated in
+`transform!` (shared with the parameterizations), minus its mean Φ̄ₖ on every layer k and minus the
+surface geopotential Φₛ = g*orography. Neither changes the divergence tendency, -∇² of the Bernoulli
+potential: Φ̄ₖ is constant on every layer (∇²Φ̄ₖ = 0) and Φₛ is added in spectral space instead
+(`bernoulli_surface_geopotential!`). But only the horizontal variations of Φ, ~1e3-1e4 m²/s² instead of
+up to ~1e6 m²/s², go through the grid→spectral transform, whose rounding errors are relative to the
+size of the transformed field and are amplified by ∇² (∝ l(l+1)) at the smallest scales. Φ - Φ̄ₖ is
+exact in floating-point arithmetic where Φ is large (Sterbenz lemma) so it's subtracted first."""
+function bernoulli_grid_potential!(vars::Variables, model::PrimitiveEquation, time_stepping::AbstractTimeStepper)
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
+    Φ = vars.dynamics.geopotential.data
+    orography = model.orography.orography.data
+    bernoulli_grid = get_step(vars.dynamics.grid.kinetic_energy)
+    NF = eltype(bernoulli_grid)
+    half = convert(NF, 0.5)
+    g = convert(NF, model.planet.gravity)               # same Φₛ = g*orography as in geopotential!
+    Φ_mean = sum(Φ, dims = 1) ./ size(Φ, 1)             # mean on every layer, (1, nlayers)
+    bernoulli_grid.data .= half .* (u.data .^ 2 .+ v.data .^ 2) .+ ((Φ .- Φ_mean) .- g .* orography)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Adds the surface geopotential Φₛ (spectral, `model.orography.surface_geopotential`) to the spectral
+Bernoulli potential on every layer, which is left out on the grid in `bernoulli_grid_potential!`."""
+function bernoulli_surface_geopotential!(vars::Variables, model::PrimitiveEquation)
+    bernoulli = get_step(vars.dynamics.kinetic_energy)
+    Φₛ = model.orography.surface_geopotential
+    bernoulli.data .+= Φₛ.data
     return nothing
 end
 
