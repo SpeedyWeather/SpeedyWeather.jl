@@ -128,6 +128,7 @@ include("variables/abstract_types.jl")
 include("models/abstract_models.jl")
 include("parameterizations/abstract_types.jl")
 include("time_stepping/abstract_types.jl")
+include("time_stepping/relaxation_integration.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/spectral_grid.jl")

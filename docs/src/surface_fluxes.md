@@ -178,7 +178,7 @@ boundary_layer = BoundaryLayer(
     spectral_grid;
     surface_condition,
     surface_roughness,
-    drag = BulkRichardsonDrag(spectral_grid, critical_Richardson = 5),
+    drag = BulkRichardsonDrag(spectral_grid, Richardson_cutoff = 5),
 )
 
 model = PrimitiveWetModel(spectral_grid; boundary_layer)
@@ -371,9 +371,9 @@ For small ``z`` we have ``\varphi = 1 - z/2 + z^2/6 - \dots``, and ``\varphi \ap
 meaning ``x`` is relaxed fully to ``x_s`` within one time step.
 
 However, evaluating ``\varphi`` requires an exponential for every grid point, every surface flux
-and every time step. This is relatively expensive: at T32L8 using `ExponentialFluxes` for all
+and every time step. This is relatively expensive: at T32L8 using `ExponentialRelaxation` for all
 surface fluxes increases the time per time step by about 5%, compared to about 1% for
-`ImplicitFluxes`. We therefore look for cheaper approximations of ``\varphi`` that keep its
+`ImplicitRelaxation`. We therefore look for cheaper approximations of ``\varphi`` that keep its
 essential properties: ``\varphi \approx 1`` for small ``z`` (the flux is unchanged if
 the time step resolves the relaxation) and ``\varphi \approx 1/z`` for large ``z``
 (``x`` relaxes to ``x_s`` but does not overshoot it). The other time integration schemes
@@ -395,10 +395,10 @@ correspond to such approximations of the exact ``\varphi``:
 
 | Scheme | ``\varphi(z)`` | ``1 - z\varphi(z)`` | Single step ``x \to x_s`` | Cost |
 | ------ | -------------- | ------------------- | ------------------------- | ---- |
-| `ExplicitFluxes()` | ``1`` | ``1 - z`` | overshoots for ``z > 1``, unstable for ``z > 2`` | none |
-| `ImplicitFluxes()` | ``\frac{1}{1 + z}`` | ``\frac{1}{1 + z}`` | monotone, stable, first order | 1 division |
-| `ExponentialFluxes()` | ``\frac{1 - e^{-z}}{z}`` | ``e^{-z}`` | monotone, stable, exact for fixed ``a, x_s`` | `exp`, ~5% of a time step at T32L8 |
-| `RationalFluxes()` (default) | ``\frac{6 + z}{6 + 4z + z^2}`` | ``\frac{6 - 2z}{6 + 4z + z^2}`` | stable, ≤10% overshoot for ``z > 3`` | 1 division |
+| `ExplicitRelaxation()` | ``1`` | ``1 - z`` | overshoots for ``z > 1``, unstable for ``z > 2`` | none |
+| `ImplicitRelaxation()` | ``\frac{1}{1 + z}`` | ``\frac{1}{1 + z}`` | monotone, stable, first order | 1 division |
+| `ExponentialRelaxation()` | ``\frac{1 - e^{-z}}{z}`` | ``e^{-z}`` | monotone, stable, exact for fixed ``a, x_s`` | `exp`, ~5% of a time step at T32L8 |
+| `RationalRelaxation()` (default) | ``\frac{6 + z}{6 + 4z + z^2}`` | ``\frac{6 - 2z}{6 + 4z + z^2}`` | stable, ≤10% overshoot for ``z > 3`` | 1 division |
 
 Because ``\varphi`` is applied to the flux (not only to the tendency) before it is stored, the fluxes
 passed on to the ocean and land models and to the output are consistent with those the atmosphere
@@ -413,17 +413,20 @@ the surface value ``x_s`` are held fixed over the time step (linearisation), whi
 The scheme is chosen per flux, for example
 
 ```julia
-spectral_grid = SpectralGrid(truncation = 31, nlayers = 8)
-surface_momentum_flux = SurfaceMomentumFlux(spectral_grid, time_integration = ExponentialFluxes())
+spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+surface_momentum_flux = SurfaceMomentumFlux(spectral_grid, time_integration = ExponentialRelaxation())
 surface_heat_flux = SurfaceHeatFlux(
     spectral_grid,
-    ocean = SurfaceOceanHeatFlux(spectral_grid, time_integration = ImplicitFluxes()),
-    land = SurfaceLandHeatFlux(spectral_grid, time_integration = ExplicitFluxes()),
+    ocean = SurfaceOceanHeatFlux(spectral_grid, time_integration = ImplicitRelaxation()),
+    land = SurfaceLandHeatFlux(spectral_grid, time_integration = ExplicitRelaxation()),
 )
 model = PrimitiveWetModel(spectral_grid; surface_momentum_flux, surface_heat_flux)
 ```
 
 and similarly for `SurfaceOceanHumidityFlux` and `SurfaceLandHumidityFlux`.
+These schemes are subtypes of `AbstractRelaxationIntegration` and integrate any relaxation
+``dx/dt = -(x - x_0)/\tau`` towards a target value ``x_0``, so they are also used for the time integration
+of the `SpeedLimitDrag`, which relaxes the wind speed towards the speed limit.
 
 ## Bulk Richardson-based drag coefficient
 
@@ -458,16 +461,19 @@ Then the drag coefficient ``C`` follows as
 ```math
 C = \begin{cases}
         C_{max} \quad &\text{for} \quad Ri_N  \leq 0\\
-        C_{max} \left(1 - \frac{Ri_N}{Ri_c}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_c \\
-        C_{min} \quad &\text{for} \quad Ri_N \geq Ri_c, \\
+        C_{max} \left(1 - \frac{Ri_N}{Ri_{cut}}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_{cut} \\
+        C_{min} \quad &\text{for} \quad Ri_N \geq Ri_{cut}, \\
     \end{cases}
 ```
 
 with the neutral drag coefficient ``C_{max}`` and the minimum drag ``C_{min}`` defined below, and 
 roughness lengths computed in the surface roughness scheme `boundary_layer.surface_roughness`, per 
 surface and per flux type. There is a maximum drag ``C`` for negative bulk Richardson numbers 
-``Ri_N`` but the drag drops to ``C_{min}`` for bulk Richardson numbers being larger than a critical
-``Ri_c = 10`` with a smooth transition in between. The height of the ``N``-th
+``Ri_N`` but the drag drops to ``C_{min}`` for bulk Richardson numbers larger than a cutoff
+``Ri_{cut} = 10`` (option `Richardson_cutoff`) with a smooth transition in between. Frierson et al. (2006)
+use a critical Richardson number of 1 here, but that lets the drag vanish where buoyancy and shear
+are still comparable. With ``Ri_{cut} = 10`` the drag only reaches its minimum where buoyancy
+dominates the shear by an order of magnitude. The height of the ``N``-th
 model layer is ``z_N = \tfrac{\Phi_N - \Phi_0}{g}`` with the geopotential
 ```math
 \Phi_N = \Phi_{0} + T_N R_d ( \log p_{N+h} - \log p_N)
@@ -486,10 +492,10 @@ the roughness length of momentum, heat or humidity, so the three coefficients sh
 but differ in their roughness lengths. This simplifies the drag coefficient calculation to
 
 ```math
-C = \max\left(C_{min}, C_{max} \left[1 - \frac{Ri_N^*}{Ri_c}\right]^2\right)
+C = \max\left(C_{min}, C_{max} \left[1 - \frac{Ri_N^*}{Ri_{cut}}\right]^2\right)
 ```
-with ``Ri_N^* = \max(0, \min(Ri_N, Ri_c))`` the clamped ``Ri_N`` which
-is at least ``0`` and at most ``Ri_c``, and ``C_{min} = 10^{-5}`` (`drag_min`) a minimum drag that avoids 
+with ``Ri_N^* = \max(0, \min(Ri_N, Ri_{cut}))`` the clamped ``Ri_N`` which
+is at least ``0`` and at most ``Ri_{cut}``, and ``C_{min} = 10^{-5}`` (`drag_min`) a minimum drag that avoids 
 vanishing surface fluxes in strongly stable conditions.
 
 ## Surface momentum fluxes
