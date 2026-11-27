@@ -443,6 +443,18 @@ end
     end
 end
 
+@testset "SingleColumn" begin
+    column = SpeedyWeather.SingleColumn(5)
+    @test column == 5:5
+    @test collect(column) == [5]
+    @test (length(column), first(column), last(column)) == (1, 5, 5)
+    sum_simd = 0
+    @simd ivdep for ij in column
+        sum_simd += ij
+    end
+    @test sum_simd == 5
+end
+
 @testset "BulkRichardsonDiffusion for ranges of columns" begin
     simulation = vertical_diffusion_simulation()
     (; model, variables) = simulation
@@ -476,6 +488,10 @@ end
         @test all_columns.conductance_heat ≈ column_by_column.conductance_heat rtol = 1.0e-6
         @test all_columns.height ≈ column_by_column.height rtol = 1.0e-6
         @test all(map((a, b) -> any(a .!= b), all_columns.tendencies, initial))     # every variable is diffused
+
+        # the SingleColumn of the kernel is the range ij:ij
+        column_ranges = diffuse!(() -> foreach(ij -> SpeedyWeather.vertical_diffusion!(ij:ij, variables, diffusion, model), 1:npoints))
+        @test column_ranges == column_by_column
 
         columns = 101:200
         others = setdiff(1:npoints, columns)
