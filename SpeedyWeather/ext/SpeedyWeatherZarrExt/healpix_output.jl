@@ -6,7 +6,7 @@
 """Grids `HEALPixOutput` can write, both equal-area and ring-ordered north to south."""
 const OUTPUT_HEALPIX_GRIDS = Union{HEALPixGrid, OctaHEALPixGrid}
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Resolution parameter `nlat_half` for an output grid of type `Grid`, from the user's
 `nlat_half` keyword or the model grid's own `nlat_half`. `HEALPixGrid` is only defined for
 even `nlat_half` (`nside = nlat_half ÷ 2`), so an odd value is rounded up; `OctaHEALPixGrid`
@@ -22,7 +22,7 @@ function healpix_nlat_half(
     return n + 1
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Resolve the output grid of a [`HEALPixOutput`](@ref) from the keyword arguments and the model
 grid `model_grid`, on CPU (the constructor moves it onto the model's architecture). In order of precedence:
 
@@ -117,7 +117,7 @@ function healpix_store_attributes(grid::OUTPUT_HEALPIX_GRIDS)
     return attrs
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Constructor for [`HEALPixOutput`](@ref). Builds the output `HEALPixGrid` and the scratch fields 
 to write from, and pre-fills `output.variables` with the defaults for `Model`.
 
@@ -152,10 +152,9 @@ function HEALPixOutput(
     # OUTPUT GRID: from `output_grid`, from `nside`/`nlat_half`, or following the model's own
     # grid type and resolution (which is what makes the interpolation skippable by default)
     output_grid = healpix_output_grid(SG.grid; nside, nlat_half, output_grid)
-    # OUTPUT GRID and MODEL GRID on the architecture to interpolate on, the model's (e.g. GPU)
-    arch = SpeedyWeather.output_architecture(SG.architecture)
-    output_grid = on_architecture(arch, output_grid)
-    input_grid = on_architecture(arch, SG.grid)
+    # OUTPUT GRID on the architecture to interpolate on, the model's (e.g. GPU)
+    output_grid = on_architecture(SG.architecture, output_grid)
+    input_grid = SG.grid
 
     # SKIP INTERPOLATION if the model already runs on this very grid: `grids_match`
     # compares the (nonparametric) grid type and nlat_half, which is exactly the condition
@@ -252,17 +251,18 @@ function initialize!(
         SpeedyWeather.interpolate_output!(output, output.land_fraction, model.land_sea_mask.land_fraction)
     end
 
-    # VARIABLES: define every output variable in the Zarr store and write initial
-    # conditions, skipping any that don't exist in the simulation — the same check the
-    # generic `output!` makes at write time, applied here so a skipped variable doesn't
-    # leave an all-fill_value phantom array behind
+    # VARIABLES: define every output variable in the Zarr store, skipping any that don't
+    # exist in the simulation — the same check the generic `output!` makes at write time,
+    # applied here so a skipped variable doesn't leave an all-fill_value phantom array behind
     simulation = Simulation(vars, model)
     warn_nonexisting_variables(output, simulation)
     for (key, var) in output.variables
         exists_in_simulation(var, simulation) || continue
         define_variable!(g, output, var, n_outputs, eltype(output.field2D))
-        output!(output, var, simulation)
     end
+
+    # write the initial conditions of all variables at once (one compiled program with Reactant)
+    output!(output, output.variables, simulation)
 
     # consolidate the store metadata (.zmetadata) for faster opening with xarray etc.;
     # the schema is complete at this point and all later writes only touch chunk files
@@ -337,7 +337,7 @@ function write_healpix_coordinates!(g::Zarr.ZGroup, output::HEALPixOutput, model
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Define a Zarr array for output `var` in the Zarr group `g` in the flat HEALPix layout:
 `(cell, vertical, time)` with the dimensions `var` doesn't have collapsed away. The time
 axis is pre-allocated to its final length `n_outputs`; unwritten chunks read back as the

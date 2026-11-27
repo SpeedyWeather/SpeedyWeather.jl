@@ -8,6 +8,13 @@ default_time_step(L::AbstractTimeStepper) = L.Δt
 extend for time steppers with changing time steps, e.g. `Leapfrog` on its first steps."""
 time_step(time_stepping::AbstractTimeStepper, clock) = default_time_step(time_stepping)
 
+"""$(TYPEDSIGNATURES) Model time [s] that passes in the current time step of `time_stepping`
+(evaluated before the clock is stepped forward). Unlike `time_step`, which is the step the
+tendencies are integrated over (e.g. 2Δt for leapfrog), this sums to the simulated period
+and is used to integrate rates over time, e.g. precipitation. Extend for time steppers with
+changing time steps, e.g. `Leapfrog` on its spin-up steps."""
+clock_increment(time_stepping::AbstractTimeStepper, clock) = time_stepping.Δt
+
 """$(TYPEDSIGNATURES)
 Time stepper for `:atmosphere`, `:ocean` (incl sea ice) or `:land` within the `time_stepping`
 setup of a model (`model.time_stepping`). Defaults to `time_stepping` itself, time steppers can
@@ -32,7 +39,7 @@ function time_step(time_stepping::AbstractTimeStepper, component::Symbol, clock)
     return Δt / time_step_scale(time_stepping, stepper, clock)
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T32` is always scaled with the resolution `truncation` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T32` is additionally 
 adjusted to the closest divisor of `interval` so that the output time axis is keeping
@@ -88,7 +95,7 @@ current `Δt` was adjusted to the output frequency (`adjust_with_output`) then t
 folded into the ratio. Pass the `model` to [`set!`](@ref) to use the exact factor instead."""
 resolution_factor(L::AbstractTimeStepper) = L.Δt / Second(L.Δt_at_T32).value
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Change the time step of timestepper `L` to `Δt` (unscaled) and disable adjustment to the output
 frequency. `set!` can be used before or after `initialize!(model)`: `Δt_at_T32` is the quantity
 `calculate_Δt!` derives the time step from, so it is back-computed here with `resolution_factor`

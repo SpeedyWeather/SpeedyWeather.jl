@@ -85,54 +85,84 @@ using Zarr
         @test any(!iszero, vor)
         @test vor[:, :, :, 1] != vor[:, :, :, end]
     end
-  
-    # Output writers can't interpolate on Reactant arrays outside of compiled code, so they
-    # interpolate on the CPU for a Reactant model, moving the model's fields there first.
-    @testset "Output writers interpolate on the CPU for Reactant" begin
+
+    # Output writers interpolate on the Reactant device (compiled), only the interpolated fields
+    # are copied to the CPU for writing
+    @testset "Output writers interpolate on the Reactant device" begin
         arch = ReactantDevice()
         cpu = SpeedyWeather.CPU()
-        @test SpeedyWeather.output_architecture(arch) isa SpeedyWeather.CPU
 
         spectral_grid = SpectralGrid(; architecture = arch, truncation = TRUNCATION)
         spectral_grid_cpu = SpectralGrid(; truncation = TRUNCATION)
         output = NetCDFOutput(spectral_grid)
         output_cpu = NetCDFOutput(spectral_grid_cpu)
 
-        @test SpeedyWeather.ismatching(cpu, output.field2D.data)
-        @test SpeedyWeather.ismatching(cpu, output.interpolator.locator.ij_as)
-        @test output.host2D === output.field2D          # written from directly, no extra copy
+        @test SpeedyWeather.ismatching(arch, output.field2D.data)
+        @test SpeedyWeather.ismatching(arch, output.interpolator.locator.ij_as)
+        @test SpeedyWeather.ismatching(cpu, output.host2D.data)     # written from the host
 
         # a field on the Reactant device interpolates to the same as on the CPU
         field_cpu = rand(Float32, spectral_grid_cpu.grid)
         field = on_architecture(arch, field_cpu)
         SpeedyWeather.interpolate_output!(output, output.field2D, field)
         SpeedyWeather.interpolate_output!(output_cpu, output_cpu.field2D, field_cpu)
-        @test output.field2D.data == output_cpu.field2D.data
+        @test Array(output.field2D.data) ≈ output_cpu.field2D.data
     end
 
-    # the height of the bottom layer is computed in a kernel, in a broadcast Reactant traces the
-    # layer index for which `pressure(k::Integer, ...)` doesn't apply
-    @testset "10m wind output on Reactant" begin
-        variable = OutputVariables.ZonalVelocity10m()
+    # With Reactant every output step is one compiled program for all output variables
+    # (`interpolate_output!` of every variable, everything but the I/O), compiled once with the
+    # initial conditions. Same files as on the CPU, and an output step costs about as much as on the CPU
+    @testset "Compiled output of all variables" begin
+        variables = (
+            OutputVariables.Divergence(), OutputVariables.SurfaceTemperature(),
+            # the height of the bottom layer is computed in a kernel, in a broadcast Reactant traces the
+            # layer index for which `pressure(k::Integer, ...)` doesn't apply
+            OutputVariables.ZonalVelocity10m(),
+            OutputVariables.PrecipitableWater(),
+            OutputVariables.LandSeaMask(),      # no time dimension, only written with the initial conditions
+        )
         simulations = map((SpeedyWeather.CPU(), ReactantDevice())) do architecture
-            spectral_grid = SpectralGrid(; architecture, nlayers = 8, truncation = TRUNCATION)
-            spectral_transform = MatrixSpectralTransform(spectral_grid)
-            path = mktempdir(pwd(), prefix = "tmp_reactant_nc_")
-            output = NetCDFOutput(spectral_grid, PrimitiveDryModel; path)
-            add!(output, variable)
-            model = PrimitiveDryModel(spectral_grid; spectral_transform, feedback = nothing, output)
-            initialize!(model)
+            output = NetCDFOutput(
+                SpectralGrid(; architecture, nlayers = 8, truncation = TRUNCATION), PrimitiveWetModel;
+                path = mktempdir(pwd(), prefix = "tmp_reactant_nc_")
+            )
+            add!(output, variables...)
+            initialize!(create_model(PrimitiveWetModel, architecture; output))
         end
         sync_variables!(simulations...)     # same state on CPU and Reactant
 
-        z_bottom = map(simulations) do simulation
-            initialize!(simulation; steps = 1, output = true)   # writes the initial conditions incl. u10
-            SpeedyWeather.output!(simulation.model.output, variable, simulation)
-            z_bottom = on_architecture(SpeedyWeather.CPU(), simulation.variables.scratch.grid.a_2D.data)
-            finalize!(simulation)
-            z_bottom
+        # write the initial conditions (compiles the output program on Reactant) and time an output step
+        output_step_times = map(simulations) do simulation
+            initialize!(simulation; steps = 1, output = true)
+            (; output) = simulation.model
+            minimum(@elapsed(SpeedyWeather.output!(output, output.variables, simulation)) for _ in 1:3)
         end
-        @test all(isfinite, z_bottom[2])
-        @test z_bottom[2] ≈ z_bottom[1]
+
+        output_cpu, output = map(simulation -> simulation.model.output, simulations)
+        compiled = output.compiled
+        @test compiled isa SpeedyWeatherReactantExt.CompiledOutput
+        @test length(compiled.variables) == length(output.variables)
+        @test all(field -> SpeedyWeather.ismatching(ReactantDevice(), field.data), compiled.fields)
+
+        SpeedyWeather.output!(output, output.variables, simulations[2])
+        @test output.compiled === compiled  # reused for every output step, not recompiled
+
+        # performance: once compiled, an output step costs about as much as on the CPU (the writing,
+        # i.e. compression, dominates), not 10-100x as when interpolating eagerly, variable by variable
+        @info "Output step CPU vs Reactant" output_step_times
+        @test output_step_times[2] < 5 * output_step_times[1]
+
+        foreach(finalize!, simulations)
+        datasets = map(output -> NCDataset(joinpath(output.run_path, output.filename)), (output_cpu, output))
+        for variable in values(output.variables)
+            a, b = map(dataset -> Array(dataset[variable.name].var), datasets)
+            @testset "$(variable.name)" begin
+                @test size(a) == size(b)
+                @test isnan.(a) == isnan.(b)
+                finite = .!isnan.(a) .& .!isnan.(b)
+                @test isapprox(a[finite], b[finite], rtol = 1.0e-2)
+            end
+        end
+        foreach(close, datasets)
     end
 end

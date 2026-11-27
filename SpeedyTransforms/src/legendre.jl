@@ -32,7 +32,7 @@
     return north, south
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Inverse Legendre transform, batched in the vertical. Not to be used
 directly, but called from transform!."""
 function _legendre!(
@@ -125,7 +125,7 @@ end
     end
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 (Forward) Legendre transform, batched in the vertical. Not to be used
 directly, but called from transform!."""
 function _legendre!(                        # GRID TO SPECTRAL
@@ -202,7 +202,7 @@ dense_legendre_polynomials(architecture::AbstractArchitecture, legendre_polynomi
     on_architecture(architecture, zeros(eltype(legendre_polynomials), 0))
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Unscale by cosine of latitude on the fly.
 """
 function unscale_coslat!(

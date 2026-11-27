@@ -79,7 +79,7 @@ function add!(D::CALLBACK_DICT, key::String, callback::AbstractCallback)
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Add a or several callbacks to a Dict{Symbol, AbstractCallback} dictionary without specifying the
 key which is randomly created like callback_????. To be used like
 

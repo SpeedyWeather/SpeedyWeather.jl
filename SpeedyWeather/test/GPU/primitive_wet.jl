@@ -15,6 +15,13 @@
 
     @test simulation.model.feedback.nans_detected == false
     @test isfile(joinpath(output.run_path, output.filename))
+
+    # the default precipitation diagnostics (see `PrecipitationDiagnostics`) accumulate on GPU
+    for name in (:rain_large_scale, :snow_large_scale, :rain_convection, :snow_convection)
+        accumulated = on_architecture(SpeedyWeather.CPU(), getproperty(simulation.variables.output, name))
+        @test all(isfinite, accumulated)
+        @test all(>=(0), accumulated)
+    end
 end
 
 @testset "GPU PrimitiveWetModel (default construction, WhichTransform)" begin

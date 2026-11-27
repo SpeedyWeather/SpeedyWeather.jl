@@ -48,11 +48,6 @@ end
 # default constructor (extended e.g. by ReactantExt)
 Clock(architecture::AbstractArchitecture) = Clock()
 
-"""$(TYPEDSIGNATURES)
-Reference to a scalar `x` that can change during the simulation, e.g. the time step the
-implicit solver was initialized with. Extended by ReactantExt to hold a traceable number."""
-scalar_ref(::AbstractArchitecture, x::Number) = Ref(x)
-
 # we don't want to adapt the clock, it has to stay mutable,
 # we just explicitly transfer nothing to the kernels
 Adapt.adapt_structure(to, ::Clock) = nothing

@@ -26,7 +26,7 @@ function spectral_smoothing(A::LowerTriangularArray, args...; kwargs...)
     return spectral_smoothing!(copy(A), args...; kwargs...)
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
 so that the highest degree `truncation` is dampened by multiplication with c. Anti-diffusion for c>1."""
 function spectral_smoothing!(

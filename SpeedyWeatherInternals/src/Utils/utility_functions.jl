@@ -11,7 +11,7 @@ function isdecreasing(v::AbstractVector)
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Prints to `io` all fields of a struct `A` identified by their
 `keys`."""
 function print_fields(io::IO, A, keys; arrays::Bool = false, values::Bool = true)
@@ -79,6 +79,14 @@ function _set_scalar!(arch::AbstractArchitecture, x::AbstractArray, i::Integer, 
     x[i:i] .= v
     return x
 end
+
+"""
+$(TYPEDSIGNATURES)
+Reference to a scalar `x` that can change during the simulation, either set at `initialize!`
+(e.g. the time step the implicit solver was initialized with) or written every time step
+(a scalar variable, e.g. CO₂, see `ScalarDim`). A plain `Ref(x)`, extended by
+SpeedyWeather's Reactant extension to hold a traceable number."""
+scalar_ref(::AbstractArchitecture, x::Number) = Ref(x)
 
 """
 $(TYPEDSIGNATURES)

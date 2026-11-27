@@ -91,7 +91,7 @@ end
 
 Adapt.@adapt_structure NCycleLorenzCore
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
 function NCycleLorenz(
         spectral_grid::SpectralGrid;
@@ -162,10 +162,10 @@ function update_prognostic!(
         time_stepping::NCycleLorenz,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
-        scale::Real = 1,
+        scale::Number = 1,
     )
     (; Δt) = time_stepping
-    Δt /= oftype(Δt, scale)     # scale on the fly
+    Δt /= scale                 # scale on the fly, scale is traced with Reactant so no oftype
     w = weight_coefficient(time_stepping, clock)
 
     # notation following largely Hotta et al. 2016

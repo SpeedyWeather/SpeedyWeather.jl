@@ -2,8 +2,7 @@ module SpeedyTransformsAMDGPUExt
 
 import AMDGPU: AMDGPU, ROCArray
 import AbstractFFTs
-using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+using SpeedyTransforms: TYPEDSIGNATURES
 
 using SpeedyTransforms
 using SpeedyTransforms.RingGrids
@@ -104,7 +103,7 @@ function _fourier_batched!(
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 HIP-Graphs accelerated inverse (spectral → grid) batched Fourier transform.
 Replays a cached HIP graph of the fused gather + per-ring inverse rocFFTs + scatter; see
 [`run_graph!`](@ref)."""

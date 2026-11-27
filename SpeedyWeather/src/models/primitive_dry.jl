@@ -46,6 +46,7 @@ $(TYPEDFIELDS)"""
         HD,     # <:AbstractHorizontalDiffusion,
         VA,     # <:AbstractVerticalAdvection,
         OU,     # <:AbstractOutput,
+        DG,     # NamedTuple of <:AbstractDiagnostic,
         FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
@@ -84,12 +85,12 @@ $(TYPEDFIELDS)"""
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer::BL = BoundaryLayer(spectral_grid)
-    @component vertical_diffusion::VD = nothing    # TODO overhaul BulkRichardsonDiffusion
+    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
     @component radiation::RA = DryRadiation(spectral_grid)
-    @component greenhouse_gases::GHG = (;)
+    @component greenhouse_gases::GHG = (; co2 = CO2(spectral_grid))
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
@@ -102,6 +103,7 @@ $(TYPEDFIELDS)"""
 
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveDry)
+    diagnostics::DG = (;)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 
@@ -114,10 +116,10 @@ $(TYPEDFIELDS)"""
 
     parameterizations::TS2 = (
         :solar_zenith,              # orbit or external forcing
-        :vertical_diffusion,        # mixing
         :boundary_layer,            # surface fluxes
         :surface_momentum_flux,
         :surface_heat_flux,
+        :vertical_diffusion,        # mixing, after the surface fluxes to spread them
         :convection,
         :albedo,                    # radiation
         :radiation,
@@ -131,7 +133,7 @@ end
 
 variables(model::PrimitiveDry) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
-"""$(TypedMethodSignatures(defaults = true)) All variables needed for the primitive dry model itself (components excluded)."""
+"""$(TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
 function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
     pg = nsteps.prognostic_grid
     ps = nsteps.prognostic_spectral
@@ -188,7 +190,7 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
 end
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!` 
@@ -225,8 +227,11 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
+    initialize!(model.custom_parameterization, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
+
+    initialize!(model.diagnostics, model)
 
     # allocate all variables
     variables = Variables(model)

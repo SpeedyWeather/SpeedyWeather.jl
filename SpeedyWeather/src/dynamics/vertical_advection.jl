@@ -162,11 +162,11 @@ end
     ξ[ij, k[2], s]
 )
 
-# 3rd order upwind
+# 3rd order upwind, face between k[2] and k[3], upwind cell k[2] for u > 0, k[3] otherwise
 @inline reconstructed_at_face(ξ, ij, s, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1], s] + 5ξ[ij, k[2], s] - ξ[ij, k[3], s]) * 1 // 6,
-    (2ξ[ij, k[4], s] + 5ξ[ij, k[3], s] - ξ[ij, k[2], s]) * 1 // 6
+    u > 0, (-ξ[ij, k[1], s] + 5ξ[ij, k[2], s] + 2ξ[ij, k[3], s]) * 1 // 6,
+    (-ξ[ij, k[4], s] + 5ξ[ij, k[3], s] + 2ξ[ij, k[2], s]) * 1 // 6
 )
 
 # 5th order upwind

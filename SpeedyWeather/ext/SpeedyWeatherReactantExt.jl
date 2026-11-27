@@ -2,8 +2,7 @@ module SpeedyWeatherReactantExt
 
 using SpeedyWeather
 using Reactant
-using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+using SpeedyWeather: TYPEDSIGNATURES
 using Dates
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!, time_steps!
@@ -25,7 +24,7 @@ const ReactantSimulation = Union{
 # the whole run is one program (as Oceananigans' compiled `run!`).
 
 """
-$(TypedMethodSignatures(defaults = true))
+$(TYPEDSIGNATURES)
 Time loop of a simulation with Reactant. Without output the whole run is one compiled program
 ([`time_steps!`](@ref), a traced loop). With output every `m` time steps, the `m` time steps between
 two outputs are one program, called once per output interval; the spin-up steps of the time
@@ -131,9 +130,30 @@ nans_detected(feedback::SpeedyWeather.Feedback) = feedback.nans_detected
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 SpeedyWeather.scalar_ref(::ReactantDevice, x::Number) = Ref(Reactant.ConcreteRNumber(x))
 
+# The clock and the scalar `Ref`s (`scalar_ref`) on the host, with plain dates and numbers instead of Reactant's, e.g.
+# for restart files: stored as Reactant types they can't be read back in another process (their device buffers are
+# gone). `StartFromFile` copies them back into the Reactant variables with `copy!(::Clock, ::Clock)` (which converts)
+# and an assignment into the `Ref`
+function SpeedyWeather.on_architecture(::SpeedyWeather.CPU, clock::SpeedyWeather.Clock{<:ReactantDatesExt.ReactantDateTime})
+    host_clock = SpeedyWeather.Clock()
+    copy!(host_clock, clock)
+    return host_clock
+end
+
+SpeedyWeather.on_architecture(::SpeedyWeather.CPU, x::Base.RefValue{<:Reactant.ConcreteRNumber}) = Ref(Reactant.to_number(x[]))
+
 # TODO: move upstream to Reactant, ReactantDatesExt defines Dates.year(::ReactantDateTime) via
 # Dates.year(days) for which Dates' method branches on the traced month, use yearmonthday instead
+# convert only the element type of a traced number, `convert(Float32, ::TracedRNumber)` has no method,
+# a traced `NF` (e.g. parameters traced for differentiation) is unwrapped to its element type
+SpeedyWeather.convert_number_format(::Type{NF}, x::Reactant.TracedRNumber) where {NF} =
+    Reactant.TracedRNumber{Reactant.unwrapped_eltype(NF)}(x)
+
 Dates.year(days::Reactant.TracedRNumber) = first(Dates.yearmonthday(days))
+
+# TODO: move upstream to Reactant, ReactantDatesExt defines datetime2julian but not datetime2unix,
+# used by `ExponentialCO2`; same as Dates' method and as ReactantDatesExt's datetime2julian
+Dates.datetime2unix(dt::ReactantDatesExt.ReactantDateTime) = (Dates.value(dt) - Dates.UNIXEPOCH) / 1000.0
 
 # TODO: move upstream to Reactant, Dates' method indexes a table with the (traced) month and branches
 # with `&&`, used by the seasonal climatologies (`monthly_interpolation`)
@@ -183,18 +203,29 @@ SpeedyWeather.dilate(Δt::Millisecond, dilation::Reactant.TracedRNumber) =
 SpeedyWeather.dilate(Δt::ReactantDatesExt.ReactantMillisecond, dilation) =
     ReactantDatesExt.ReactantMillisecond(round(Int, Δt.value * dilation))
 
+# TODO: remove once Reactant reduces over views of concrete arrays, which might be resolved by
+# EnzymeAD/Reactant.jl#3660 (`mapreduce` over wrapped concrete arrays, e.g. a `SubArray`, as one compiled
+# reduction) together with EnzymeAD/Reactant.jl#3531 (`count` over traced arrays, Base's `_bool` predicate
+# wrapper throws for a `TracedRNumber{Bool}`). Until then `count` over a view of the σ levels in
+# `free_troposphere_layers` (once at initialize!) falls back to scalar indexing, so count on a CPU copy
+const ConcreteVerticalCoordinates = Union{
+    SpeedyWeather.SigmaCoordinates{<:Any, <:Any, <:Reactant.AbstractConcreteArray},
+    SpeedyWeather.SigmaPressureCoordinates{<:Any, <:Any, <:Reactant.AbstractConcreteArray},
+}
+
+SpeedyWeather.free_troposphere_layers(clouds::SpeedyWeather.DiagnosticClouds, vertical_coordinates::ConcreteVerticalCoordinates) =
+    SpeedyWeather.free_troposphere_layers(clouds, SpeedyWeather.Adapt.adapt(Array, vertical_coordinates))
+
 # OUTPUT HANDLING FOR REACTANT
 #
-# Reactant cannot trace through the output! pipeline: `output!` interpolates onto
-# CPU scratch fields and writes to disk, both of which are runtime side effects
-# the tracer can't (and shouldn't) capture. We split the behaviour by tracing context:
+# Writing to disk can't happen inside a compiled program. We split the behaviour by tracing context:
 #   - Inside `@compile` (`within_compile()` == true): `do_output!`, which every output
 #     writer calls to decide whether to write, returns false. Nothing gets baked into
 #     the compiled `time_step!`, so the compiled function only does numerics.
 #   - Outside `@compile`: `time_stepping!` (above) explicitly invokes
-#     `output!(output, simulation)` after each compiled step. The simulation's
-#     data is then ConcretePJRTArrays, which the standard output path can
-#     consume via `on_architecture(CPU(), …)`.
+#     `output!(output, simulation)` between the compiled time steps. Everything of an output
+#     step but the I/O, i.e. `interpolate_output!` of all output variables, is one compiled
+#     program (see `CompiledOutput` below), the host then copies, bitrounds and writes.
 const ReactantClock = SpeedyWeather.Clock{<:ReactantDatesExt.ReactantDateTime}
 
 # same for the feedback (progress meter, NaN detection), skipped inside `@compile`
@@ -244,5 +275,75 @@ end
 # materialise into a plain DateTime and forward to the output-specific DateTime method (NetCDF, Zarr, …)
 SpeedyWeather.output!(output::SpeedyWeather.AbstractOutput, time::ReactantDatesExt.ReactantDateTime) =
     SpeedyWeather.output!(output, convert(DateTime, time))
+
+"""$(TYPEDSIGNATURES)
+Compiled output step of an output writer: `output_func!` computes all output `variables`
+(those that exist in the simulation) with `interpolate_output!` into `fields`, one field on the
+output grid (on the device) per variable. Kept in the output writer's `core.compiled`."""
+struct CompiledOutput{P, V, F}
+    output_func!::P # compiled `interpolate_outputs!`
+    variables::V    # tuple of output variables
+    fields::F       # tuple of fields to compute them into, on the output grid on the device
+end
+
+# Like the feedback, not traced when compiling e.g. the time step (which captures the output writer
+# through the model), so that its fields don't become arguments of every compiled program
+Reactant.traced_type_inner(
+    @nospecialize(T::Type{<:CompiledOutput}), seen, @nospecialize(mode::Reactant.TraceMode),
+    @nospecialize(track_numbers::Type), @nospecialize(ndevices), @nospecialize(runtime),
+) = T
+
+function Reactant.make_tracer(seen, @nospecialize(prev::CompiledOutput), @nospecialize(path), mode; kwargs...)
+    if mode == Reactant.TracedToTypes
+        push!(path, Core.Typeof(prev))
+        return nothing
+    end
+    return prev
+end
+
+# all output variables into their fields, to be compiled as one program
+function interpolate_outputs!(fields::Tuple, variables::Tuple, output, simulation)
+    foreach(fields, variables) do field, variable
+        SpeedyWeather.interpolate_output!(field, output, variable, simulation)
+    end
+    return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
+The compiled output step `output.compiled` for `output_variables`, compiled (and its fields allocated)
+on the first call after `initialize!(output, ...)`, which resets it."""
+function compiled_output!(
+        output::SpeedyWeather.AbstractOutput,
+        output_variables::SpeedyWeather.OUTPUT_VARIABLES_DICT,
+        simulation::ReactantSimulation,
+    )
+    output.compiled isa CompiledOutput && return output.compiled
+    exists(variable) = SpeedyWeather.OutputVariables.exists_in_simulation(variable, simulation)
+    variables = Tuple(filter(exists, collect(values(output_variables))))
+    fields = map(variable -> similar(first(SpeedyWeather.scratch_fields(output, variable))), variables)
+    output_func! = @compile compile_options = reactant_compile_options() interpolate_outputs!(fields, variables, output, simulation)
+    return output.compiled = CompiledOutput(output_func!, variables, fields)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Output all `output_variables` of a Reactant `simulation`: one compiled program computes them all on
+the device (see [`compiled_output!`](@ref)), then every variable is copied to the host, bitrounded and
+written. Variables without a time dimension are only written with the initial conditions."""
+function SpeedyWeather.output!(
+        output::SpeedyWeather.AbstractOutput,
+        output_variables::SpeedyWeather.OUTPUT_VARIABLES_DICT,
+        simulation::ReactantSimulation,
+    )
+    (; output_func!, variables, fields) = compiled_output!(output, output_variables, simulation)
+    output_func!(fields, variables, output, simulation)
+    for (field, variable) in zip(fields, variables)
+        ~SpeedyWeather.OutputVariables.hastime(variable) && output.output_counter > 1 && continue
+        host = last(SpeedyWeather.scratch_fields(output, variable))
+        SpeedyWeather.write_output!(output, variable, field, host)
+    end
+    return nothing
+end
 
 end

@@ -24,6 +24,10 @@ Fields are $(TYPEDFIELDS)"""
 
     "[DERIVED] output step counter, incremented every time output is written"
     output_counter::Int = 0
+
+    "[DERIVED] compiled output program, in case Reactant is used, compiled on the first output
+    after initialize! (which resets it), `nothing` otherwise"
+    compiled::Any = nothing
 end
 
 const OUTPUT_WRITER_CORE_FIELDS = fieldnames(OutputWriterCore)
@@ -46,7 +50,7 @@ function Base.setproperty!(output::AbstractOutput, s::Symbol, v)
     return setfield!(output, s, v)
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Initialize the `OutputWriterCore` from the option fields of `output` and `model`:
 determine the run folder (skipped for in-memory writers when `create_folder=false`),
 compute the output frequency from `model.time_stepping`, reset the output counter,
@@ -73,6 +77,7 @@ function initialize!(
 
     # RESET COUNTERS
     core.output_counter = 1             # start at 1 for writing the initial conditions
+    core.compiled = nothing             # recompile (Reactant) for possibly changed variables or model
 
     # VERTICAL OUTPUT LAYERS, PressureLayers allocate at construction, but take κ for
     # any dry-adiabatic extrapolation from the model's atmosphere

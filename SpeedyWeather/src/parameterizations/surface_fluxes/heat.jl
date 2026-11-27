@@ -50,7 +50,7 @@ export SurfaceOceanHeatFlux
 turbulent exchange of sensible heat between the ocean surface and the atmosphere
 based on temperature differences and wind speed. Uses bulk aerodynamic formulas
 with drag coefficients. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceOceanHeatFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceOceanHeatFlux{NF, FI <: AbstractRelaxationIntegration} <: AbstractSurfaceHeatFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
@@ -126,7 +126,7 @@ turbulent exchange of sensible heat between the land surface and the atmosphere
 based on soil temperature differences and wind speed. Uses bulk aerodynamic 
 formulas with drag coefficients that can account for surface roughness. 
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceLandHeatFlux{NF, FI <: AbstractFluxIntegration} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceLandHeatFlux{NF, FI <: AbstractRelaxationIntegration} <: AbstractSurfaceHeatFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 

@@ -1,4 +1,4 @@
-name: Reactant Correctness
+name: Reactant
 on:
   pull_request:
     branches:
@@ -9,8 +9,10 @@ on:
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
-  correctness-test:
-    name: Reactant Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
+  reactant-test:
+    # two groups of tests in parallel jobs (see SpeedyWeather/test/reactant/runtests.jl): unit tests of
+    # single features and the correctness tests of whole models against the CPU
+    name: Reactant ${{ matrix.tests }} tests - Julia v${{ matrix.version }}, ${{ matrix.os }}
     # don't run if any of these labels are present
     if: >
       !( 
@@ -19,7 +21,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'skip-reactant-ci')
       )
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 140
     permissions:
       actions: write
       contents: read
@@ -27,9 +29,12 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.12'
+          - '1.13'
         os:
           - ubuntu-latest
+        tests:
+          - unit
+          - correctness
     steps:
       - uses: actions/checkout@v7
       
@@ -53,8 +58,8 @@ jobs:
             Pkg.instantiate()
           '
       
-      - name: Run Reactant correctness tests
+      - name: Run Reactant ${{ matrix.tests }} tests
         run: |
-          julia --color=yes --project=SpeedyWeather/test/reactant SpeedyWeather/test/reactant/runtests.jl
+          julia --color=yes --project=SpeedyWeather/test/reactant SpeedyWeather/test/reactant/runtests.jl ${{ matrix.tests }}
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

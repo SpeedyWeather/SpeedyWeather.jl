@@ -1,8 +1,8 @@
 module LowerTriangularArrays
 
 # DOCUMENTATION
-using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+using DocStringExtensions: TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 using StyledStrings
 
 # NUMERICS
@@ -41,7 +41,7 @@ export LowerTriangularArrayWithTime, LowerTriangularArrayWithVertical, LowerTria
 export eachharmonic, eachmatrix, eachorder, orders
 export OneBased, ZeroBased
 export lta_view
-export zero_last_degree!
+export truncate_extra_degree!
 
 include("index_basis.jl")
 include("spectrum.jl")

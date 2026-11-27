@@ -114,7 +114,8 @@ function initialize!(
     (; radius, gravity, rotation) = P
     φ = G.latds                         # latitude for each grid point [˚N]
 
-    (; orography, surface_geopotential, η₀, u₀) = orog
+    (; orography, surface_geopotential, η₀) = orog
+    u₀ = jet_speed(orog.u₀, rotation)       # easterly jet on a retrograde planet
     NF = eltype(orography)
 
     ηᵥ = (1 - η₀) * π / 2                     # ηᵥ-coordinate of the surface [1]
@@ -227,7 +228,11 @@ function initialize!(
         version = orog.version
     )
 
-    orography_highres = on_architecture(S.architecture, field)
+    # interpolate in the model's precision, not in that of the file (Float32): otherwise the interpolated
+    # orography depends at the level of Float32 rounding on how the interpolation is compiled (e.g. fused
+    # multiply-adds when raised with Reactant), and differs between architectures also in Float64 models
+    NF = eltype(orography)
+    orography_highres = on_architecture(S.architecture, Field(convert.(NF, field.data), field.grid))
     synchronize(S.architecture)
 
     # Interpolate/coarsen to desired resolution, jitted as one compiled function on Reactant

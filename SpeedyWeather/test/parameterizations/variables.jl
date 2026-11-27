@@ -1,6 +1,6 @@
 @testset "Variable system for parameterizations" begin
 
-    struct MyParam end
+    struct MyParam <: SpeedyWeather.AbstractParameterization end
 
     MyParam(::SpectralGrid) = MyParam()
 

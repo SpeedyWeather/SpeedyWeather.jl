@@ -43,6 +43,11 @@ function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars},
     return integrator.state
 end
 
+# The Terrarium state (`vars.prognostic.land.terrarium`) is moved to the host with Terrarium's own
+# `on_architecture`, e.g. when writing restart files, see `WriteVariablesRestartFile`
+SpeedyWeather.on_architecture(::SpeedyWeather.CPU, state::Terrarium.StateVariables) =
+    Terrarium.on_architecture(Terrarium.CPU(), state)
+
 """$(TYPEDEF)
 
 Abstract base type for SpeedyWeather land components that delegate land
@@ -59,7 +64,8 @@ on this abstract type:
   freshly-allocated state and seeds the soil mirrors.
 * [`timestep!`](@ref) pushes SpeedyWeather atmospheric forcings into the
   Terrarium inputs, runs the Terrarium integrator for the duration of the
-  SpeedyWeather step using `land.Δt` as the sub-step, and
+  SpeedyWeather step in equal sub-steps no longer than `land.Δt` (by default `nothing`:
+  one Terrarium step per SpeedyWeather step), so that both clocks stay in sync, and
   copies soil temperatures, moisture and surface fluxes back into the
   SpeedyWeather variables.
 """
@@ -74,7 +80,7 @@ only allocates columns where this mask is `true`, so every Terrarium state field
 has length `sum(mask)` (the number of land columns)."""
 @inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 
 Boolean land mask (`Field{Bool}`) derived from a SpeedyWeather [`AbstractLandSeaMask`](@ref):
 `true` wherever the fractional `land_fraction` exceeds `threshold`. Pass the result to
@@ -85,7 +91,7 @@ is required for consistent coupling (see [`check_mask_consistency`](@ref))."""
 land_mask(land_sea_mask::SpeedyWeather.AbstractLandSeaMask; threshold = 0) =
     land_sea_mask.land_fraction .> threshold
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 
 Convenience constructor building a Terrarium [`ColumnRingGrid`](@ref) directly from a
 SpeedyWeather [`AbstractLandSeaMask`](@ref), so the Terrarium land columns and the
@@ -217,7 +223,7 @@ struct TerrariumLand{
     initializers::IT
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
-    "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
+    "Maximum Terrarium sub-step (seconds or a `Period`) used to integrate within each SpeedyWeather step, which is split into the fewest equal sub-steps not longer than `Δt`; `nothing` takes a single step of the SpeedyWeather step length"
     Δt::TT
     "Indices of the common land sea mask, used for allocation-free copying between SpeedyWeather and Terrarium"
     mask_indices::MI
@@ -227,7 +233,35 @@ struct TerrariumLand{
     ocean_moisture::NF
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+# Maximum Terrarium sub-step `Δt` in whole milliseconds, given in seconds or as a `Period`
+max_substep_milliseconds(Δt::Period) = Dates.value(Millisecond(Δt))
+max_substep_milliseconds(Δt::Real) = round(Int, 1000 * Δt)
+
+# Number of equal Terrarium sub-steps that cover a SpeedyWeather step of length `period` with none longer
+# than the maximum sub-step `Δt`; `nothing` takes a single step of length `period`. Counted in whole
+# milliseconds, so that e.g. a 10 min sub-step of a 20 min step gives exactly 2 without rounding errors.
+terrarium_substeps(::Nothing, period::Millisecond) = 1
+terrarium_substeps(Δt, period::Millisecond) = cld(Dates.value(period), max_substep_milliseconds(Δt))
+
+# Integrate the Terrarium land over exactly `period` in equal sub-steps no longer than `Δt`, so that the
+# Terrarium clock stays in sync with SpeedyWeather's even if `Δt` does not divide `period`.
+function run_terrarium!(integrator::ModelIntegrator, Δt, period::Millisecond)
+    start_time = integrator.clock.time
+    nsteps = terrarium_substeps(Δt, period)
+    Terrarium.run!(integrator; steps = nsteps, Δt = Dates.value(period) / (1000 * nsteps))
+    # The clock advances by each sub-step converted to the model's number format, which is rounded
+    # unless the sub-step is a whole number of milliseconds, so set the exact end time of the step
+    integrator.clock.time = start_time + period
+    return integrator
+end
+
+# Length of the current SpeedyWeather step for the land: the land time step of `time_stepping`, which for
+# `Leapfrog` is Δt/2 on the first two steps, when the clock only advances by Δt/2, and Δt afterwards.
+# `clock.Δt` is always the full Δt, so integrating the land over it would run the land clock ahead.
+terrarium_period(time_stepping, clock) =
+    Millisecond(round(Int, 1000 * SpeedyWeather.time_step(time_stepping, :land, clock)))
+
+"""$(TYPEDSIGNATURES)
 
 Construct a [`TerrariumLand`](@ref) from a Terrarium land model and a
 SpeedyWeather spectral grid."""
@@ -238,7 +272,7 @@ function TerrariumLand(
         boundary_conditions::NamedTuple = (;),
         initializers::NamedTuple = (;),
         fields::NamedTuple = (;),
-        Δt = Minute(5),
+        Δt = nothing,
         ocean_temperature::Real = 285,
         ocean_moisture::Real = 0,
     ) where {NF}
@@ -252,6 +286,8 @@ function TerrariumLand(
     # points, so invert it to get the indices of the (unmasked) land columns.
     mask_indices = RingGrids.unmasked_indices(.!model.grid.mask)
     Δt = isa(Δt, Number) ? NF(Δt) : Δt
+    isnothing(Δt) || max_substep_milliseconds(Δt) > 0 ||
+        throw(ArgumentError("The Terrarium sub-step Δt must be at least 1 ms or `nothing`, got Δt = $Δt"))
     return TerrariumLand(
         spectral_grid, geometry, model,
         boundary_conditions, inputs, initializers, fields, Δt, mask_indices,
@@ -359,6 +395,8 @@ function SpeedyWeather.initialize!(
         state, land.initializers,
     )
     Terrarium.initialize!(integrator)
+    # Terrarium releases up to 0.1.10 reset the clock to its zero time in `initialize!`, so sync it again
+    state.clock.time = vars.prognostic.clock.time
 
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
     sat = @view interior(state.saturation_water_ice)[:, 1, end]
@@ -435,7 +473,8 @@ function SpeedyWeather.timestep!(
         state.clock, tmodel, land.inputs,
         state, land.initializers,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
+    run_terrarium!(integrator, land.Δt, period)
 
     # Push Terrarium output back into SpeedyWeather coupling variables.
     # The Terrarium state itself is mutated in place above and remains in
@@ -515,7 +554,8 @@ function SpeedyWeather.timestep!(
         state.clock, land_model, InputSources(NF),
         state, land.initializers,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
+    period = terrarium_period(model.time_stepping, vars.prognostic.clock)
+    run_terrarium!(integrator, land.Δt, period)
 
     # Surface soil temperature from the bottom of the column (last z-index)
     vars.prognostic.land.soil_temperature[mask, 1] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)

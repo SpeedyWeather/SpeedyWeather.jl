@@ -95,9 +95,9 @@ get_step(var::AbstractArray) = get_step(var, size(var, ndims(var)))
 # (otherwise the device-side MethodError aborts kernel compilation). Without the dimension
 # information of a Field/LowerTriangularArray, `step` here always indexes the last dimension;
 # for arrays without an explicit step dimension `step` must be 1 (trailing singleton dimension).
-@inline get_step(var::AbstractArray{T, 1}, step::Integer) where {T} = view(var, :, step)
-@inline get_step(var::AbstractArray{T, 2}, step::Integer) where {T} = view(var, :, step)
-@inline get_step(var::AbstractArray{T, 3}, step::Integer) where {T} = view(var, :, :, step)
+@propagate_inbounds get_step(var::AbstractArray{T, 1}, step::Integer) where {T} = view(var, :, step)
+@propagate_inbounds get_step(var::AbstractArray{T, 2}, step::Integer) where {T} = view(var, :, step)
+@propagate_inbounds get_step(var::AbstractArray{T, 3}, step::Integer) where {T} = view(var, :, :, step)
 
 # LOWER TRIANGULAR ARRAYS
 # `step` always indexes the time dimension `T` in the variable's ArrayDimensions (LMT, LMZT).
@@ -110,8 +110,8 @@ Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTrian
 variables e.g. used for the leapfrog time step. These methods are for spectral variables
 WITHOUT a time dimension (`LM`, `LMZ`), which have no step dimension to select from: the full
 array is returned as a view and `step` is ignored (it should be 1)."""
-@inline get_step(var::LowerTriangularArray{T, 1, A, S, ArrayDimensions.LM}, step::Integer) where {T, A, S} = lta_view(var, :)
-@inline get_step(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMZ}, step::Integer) where {T, A, S} = lta_view(var, :, :)
+@propagate_inbounds get_step(var::LowerTriangularArray{T, 1, A, S, ArrayDimensions.LM}, step::Integer) where {T, A, S} = lta_view(var, :)
+@propagate_inbounds get_step(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMZ}, step::Integer) where {T, A, S} = lta_view(var, :, :)
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
@@ -119,8 +119,8 @@ Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTrian
 variables e.g. used for the leapfrog time step. These methods are for spectral variables WITH a
 time dimension (`LMT` horizontal + time, `LMZT` horizontal + vertical + time), whose last
 dimension is the step dimension."""
-@inline get_step(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMT}, step::Integer) where {T, A, S} = lta_view(var, :, step)
-@inline get_step(var::LowerTriangularArray{T, 3, A, S, ArrayDimensions.LMZT}, step::Integer) where {T, A, S} = lta_view(var, :, :, step)
+@propagate_inbounds get_step(var::LowerTriangularArray{T, 2, A, S, ArrayDimensions.LMT}, step::Integer) where {T, A, S} = lta_view(var, :, step)
+@propagate_inbounds get_step(var::LowerTriangularArray{T, 3, A, S, ArrayDimensions.LMZT}, step::Integer) where {T, A, S} = lta_view(var, :, :, step)
 
 # FIELDS
 # same as for LowerTriangularArrays: `step` always indexes the time dimension `T` in the
@@ -132,8 +132,8 @@ Get the i-th step of a field as a view (wrapped into the same type as the input 
 variables e.g. used for the leapfrog time step. These methods are for fields WITHOUT a time
 dimension (`XY`, `XYZ`), which have no step dimension to select from: the full array is
 returned as a view and `step` is ignored (it should be 1)."""
-@inline get_step(var::AbstractField{T, 1, A, G, ArrayDimensions.XY}, step::Integer) where {T, A, G} = field_view(var, :)
-@inline get_step(var::AbstractField{T, 2, A, G, ArrayDimensions.XYZ}, step::Integer) where {T, A, G} = field_view(var, :, :)
+@propagate_inbounds get_step(var::AbstractField{T, 1, A, G, ArrayDimensions.XY}, step::Integer) where {T, A, G} = field_view(var, :)
+@propagate_inbounds get_step(var::AbstractField{T, 2, A, G, ArrayDimensions.XYZ}, step::Integer) where {T, A, G} = field_view(var, :, :)
 
 """$(TYPEDSIGNATURES)
 Get the i-th step of a field as a view (wrapped into the same type as the input variable).
@@ -141,9 +141,9 @@ Get the i-th step of a field as a view (wrapped into the same type as the input 
 variables e.g. used for the leapfrog time step. These methods are for fields WITH a time
 dimension (`XYT` horizontal + time, `XYZT` horizontal + vertical + time), whose last dimension
 is the step dimension."""
-@inline get_step(var::AbstractField{T, 1, A, G, ArrayDimensions.XYT}, step::Integer) where {T, A, G} = field_view(var, :, step)
-@inline get_step(var::AbstractField{T, 2, A, G, ArrayDimensions.XYT}, step::Integer) where {T, A, G} = field_view(var, :, step)
-@inline get_step(var::AbstractField{T, 3, A, G, ArrayDimensions.XYZT}, step::Integer) where {T, A, G} = field_view(var, :, :, step)
+@propagate_inbounds get_step(var::AbstractField{T, 1, A, G, ArrayDimensions.XYT}, step::Integer) where {T, A, G} = field_view(var, :, step)
+@propagate_inbounds get_step(var::AbstractField{T, 2, A, G, ArrayDimensions.XYT}, step::Integer) where {T, A, G} = field_view(var, :, step)
+@propagate_inbounds get_step(var::AbstractField{T, 3, A, G, ArrayDimensions.XYZT}, step::Integer) where {T, A, G} = field_view(var, :, :, step)
 
 # anything that can decide which variable step to get
 const STEP_COMPONENT = Union{AbstractModelComponent, SpeedyTransforms.AbstractSpectralTransform}
@@ -168,14 +168,14 @@ between models but also whether a variable is spectral or a grid variable."""
 which_step
 
 # methods independent of model
-@inline get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_step(var, TS, C))
-@inline get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_prognostic_step(var, TS, C))
-@inline get_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_tendency_step(var, TS, C))
+@propagate_inbounds get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_step(var, TS, C))
+@propagate_inbounds get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_prognostic_step(var, TS, C))
+@propagate_inbounds get_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_tendency_step(var, TS, C))
 
 # methods dependent on model
-@inline get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_step(var, TS, C, M))
-@inline get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_prognostic_step(var, TS, C, M))
-@inline get_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_tendency_step(var, TS, C, M))
+@propagate_inbounds get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_step(var, TS, C, M))
+@propagate_inbounds get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_prognostic_step(var, TS, C, M))
+@propagate_inbounds get_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_tendency_step(var, TS, C, M))
 
 # if dispatch over model is not defined then fallback to dispatch without model
 @inline which_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, ::AbstractModel) = which_step(var, TS, C)

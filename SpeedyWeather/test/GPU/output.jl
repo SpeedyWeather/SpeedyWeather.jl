@@ -83,6 +83,16 @@ end
 
     for output in writers
         add!(output, OutputVariables.All()...)
+
+        # on pressure layers mask temperature below the surface, NaNs that have to stay NaN in the output
+        if output.layers isa PressureLayers
+            add!(
+                output, OutputVariables.Temperature(
+                    extrapolation = SpeedyWeather.SubsurfaceMask(above_surface = SpeedyWeather.DryAdiabaticExtrapolation()),
+                )
+            )
+        end
+
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
 
@@ -94,7 +104,16 @@ end
         # the last written temperature agrees with the final state interpolated on the CPU
         temperature = SpeedyWeather.get_prognostic_step(simulation.variables.grid.temperature, model.time_stepping, output)
         temperature = on_architecture(SpeedyWeather.CPU(), temperature)     # the step written out
-        output.layers isa PressureLayers && continue    # vertical interpolation on top, not compared
+        if output.layers isa PressureLayers             # vertical interpolation on top, not compared
+            # but the masked values (1000 hPa below the surface over orography) have to be NaN:
+            # GPU arithmetic produces the NaN 0x7fffffff, which the mantissa rounding wrote as -0
+            written = NCDataset(joinpath(output.run_path, output.filename)) do ds
+                ds["temp"].var[:, :, :, end]
+            end
+            @test 0 < count(isnan, written) < length(written)
+            @test !any(x -> x === -0.0f0, written)
+            continue
+        end
         output isa HEALPixOutput && continue            # different output grid, covered above
         expected = RingGrids.interpolate(on_architecture(SpeedyWeather.CPU(), output.field3D.grid), temperature)
         grid = output.host3D.grid

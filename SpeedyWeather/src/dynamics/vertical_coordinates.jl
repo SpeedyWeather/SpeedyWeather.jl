@@ -76,7 +76,7 @@ function Base.show(io::IO, σ::SigmaCoordinates)
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Vertical sigma coordinates defined by their half levels. Sigma coordinates are
 fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
 The first half level is at 0 the last at 1. Default `profile` is equally spaced from 0 to 1 (including)."""
@@ -174,6 +174,10 @@ pressure_sensitivity_half(coordinate::SigmaCoordinates) = coordinate.σ_half
 Sensitivity of the pressure thickness of full level `k` to `surface_pressure`, ∂Δp_k/∂pₛ,
 for sigma `coordinate`. Equals Δσ_k for `SigmaCoordinates`."""
 @inline pressure_thickness_sensitivity(k::Integer, coordinate::SigmaCoordinates) = coordinate.σ_thickness[k]
+
+"""$(TYPEDSIGNATURES)
+Sigma coordinates at all full levels as vector, `sigma(k, coordinate)` for all `k`."""
+sigma_full(coordinate::SigmaCoordinates) = coordinate.σ_full
 
 export FriersonSigmaCoordinates
 
@@ -406,7 +410,7 @@ for hybrid sigma-pressure `coordinate`. Returns `B_thickness[k]`. Equals Δσ_k 
 
 export RampSigmaPressureCoordinates
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Transition function for `RampSigmaPressureCoordinates`, returning B(σ)/σ. The slope g = dB/dσ
 is 0 for σ ≤ `pressure_only_above` (pure pressure), increases linearly over `ramp_width` and is
 constant g_max = 1/(1 - pressure_only_above - ramp_width/2) below, so that B(1) = 1. As the
@@ -422,7 +426,7 @@ function ramp_transition(σ; pressure_only_above = 0.2, ramp_width = 0.3)
     return ifelse(σ > 0, B / σ, zero(σ))
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Sigma-pressure coordinate with pure pressure levels above σ = `pressure_only_above` and a B(σ)
 that grows linearly in σ below a ramp of width `ramp_width` (see `ramp_transition`). This keeps the
 layers thick over high orography: at pₛ ≈ 570 hPa the thinnest layer is ~0.6 of its sigma-coordinate
@@ -432,6 +436,10 @@ layers towards the surface with the default Frierson spacing) carries over."""
 # σ_half as vector or σ spacing profile function as in SigmaPressureCoordinates
 RampSigmaPressureCoordinates(SG::SpectralGrid, σ_half_or_profile; pressure_only_above = 0.2, ramp_width = 0.3, kwargs...) =
     SigmaPressureCoordinates(SG, σ_half_or_profile; transition = σ -> ramp_transition(σ; pressure_only_above, ramp_width), kwargs...)
+
+"""$(TYPEDSIGNATURES)
+Sigma coordinates at all full levels as vector, `sigma(k, coordinate)` for all `k`."""
+sigma_full(coordinate::SigmaPressureCoordinates) = coordinate.A_full .+ coordinate.B_full
 
 # default with Frierson's σ spacing (as FriersonSigmaCoordinates) for thinner layers towards the surface
 RampSigmaPressureCoordinates(SG::SpectralGrid; σ_half = sigma_half_spacing(SG.nlayers, frierson_profile), kwargs...) =

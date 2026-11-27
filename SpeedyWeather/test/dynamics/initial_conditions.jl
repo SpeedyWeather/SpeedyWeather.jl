@@ -375,7 +375,7 @@ end
     simulation = initialize!(model)
     run!(simulation, period = Day(1))
 
-    P = simulation.variables.parameterizations
+    P = simulation.variables.output         # no output so accumulated over the whole run
     rain = P.rain_convection .+ P.rain_large_scale .+ P.snow_large_scale     # accumulated [m]
     weights = RingGrids.get_quadrature_weights(spectral_grid.grid)
     global_mean_rain = sum(zonal_mean(rain) .* weights) / sum(weights) * 1000  # [mm] in 1 day
@@ -429,4 +429,58 @@ end
     humid = vars_wet.prognostic.humidity
 
     @test !all(iszero.(humid))
+end
+
+@testset "Retrograde rotation" begin
+    spectral_grid = SpectralGrid(nlayers = 8)
+    rotation = SpeedyWeather.DEFAULT_ROTATION
+    prognostic(vars, var) = copy(SpeedyWeather.get_step(getproperty(vars.prognostic, var), 1))
+
+    # a retrograde planet starts from the mirror image (Ω, u) -> (-Ω, -u) of the prograde initial
+    # state: same temperature, opposite vorticity. Without perturbation, which isn't mirrored
+    jets = (
+        BalancedZonalState = ((; zonal = BalancedZonalState(spectral_grid; perturb_uₚ = 0)), PrimitiveWetModel),
+        ZonalWind = ((; vordiv = ZonalWind(spectral_grid; perturb_uₚ = 0), temp = JablonowskiTemperature(spectral_grid)), PrimitiveDryModel),
+    )
+    @testset "$name" for (name, (initial_conditions, Model)) in pairs(jets)
+        states = map((rotation, -rotation)) do rotation
+            model = Model(spectral_grid; planet = Earth(spectral_grid; rotation), initial_conditions)
+            vars = initialize!(model).variables
+            (; vor = prognostic(vars, :vorticity), temp = prognostic(vars, :temperature))
+        end
+        prograde, retrograde = states
+        @test retrograde.vor ≈ -prograde.vor
+        @test retrograde.temp ≈ prograde.temp
+    end
+
+    # the jet-balanced temperature of StartFromRest is the same on a retrograde planet,
+    # previously the poles started ~60 K warmer than the tropics and the model blew up
+    temps = map((rotation, -rotation)) do rotation
+        model = PrimitiveWetModel(
+            spectral_grid; planet = Earth(spectral_grid; rotation),
+            initial_conditions = StartFromRest(spectral_grid)
+        )
+        prognostic(initialize!(model).variables, :temperature)
+    end
+    @test temps[2] ≈ temps[1]
+
+    # the ZonalRidge orography is the same too
+    orographies = map((rotation, -rotation)) do rotation
+        model = PrimitiveDryModel(
+            spectral_grid; planet = Earth(spectral_grid; rotation),
+            orography = ZonalRidge(spectral_grid)
+        )
+        initialize!(model)
+        copy(model.orography.orography)
+    end
+    @test orographies[2] ≈ orographies[1]
+
+    # and a retrograde simulation runs
+    model = PrimitiveWetModel(
+        spectral_grid; planet = Earth(spectral_grid; rotation = -rotation),
+        initial_conditions = StartFromRest(spectral_grid)
+    )
+    simulation = initialize!(model)
+    run!(simulation, period = Day(10))
+    @test !simulation.model.feedback.nans_detected
 end

@@ -14,19 +14,21 @@ initialize!(clouds::NoClouds, ::AbstractModel) = nothing
     temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, clouds)
     NF = eltype(temp)
     cloud_cover = zero(NF)           # no cloud cover
-    cloud_top = size(temp, 2) + 1    # below surface
+    nlayers = size(temp, 2)
+    cloud_top = nlayers + 1          # below surface
 
     return (    # NamedTuple
         cloud_cover = cloud_cover,
         cloud_albedo = zero(NF),
         cloud_top = cloud_top,
+        cloud_base = nlayers,
         stratocumulus_cover = zero(NF),
         stratocumulus_albedo = zero(NF),
     )
 end
 
 export DiagnosticClouds
-@parameterized @kwdef struct DiagnosticClouds{NF} <: AbstractShortwaveClouds
+@parameterized @kwdef struct DiagnosticClouds{NF, RI} <: AbstractShortwaveClouds
     "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
     @param relative_humidity_threshold_min::NF = 0.3 (bounds = 0 .. 1,)
 
@@ -43,30 +45,50 @@ export DiagnosticClouds
     @param precipitation_max::NF = 10 (bounds = Positive,)
 
     "[OPTION] Cloud albedo for visible band at CLC=1 [1]"
-    @param cloud_albedo::NF = 0.6 (bounds = 0 .. 1,)
+    @param cloud_albedo::NF = 0.43 (bounds = 0 .. 1,)
 
     "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
     @param stratocumulus_albedo::NF = 0.5 (bounds = 0 .. 1,)
 
-    "[OPTION] Static stability lower threshold for stratocumulus (GSEN, called GSES0 in the paper) [J/kg]"
+    "[OPTION] Static stability lower threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ [1]"
     @param stratocumulus_stability_min::NF = 0.25 (bounds = Nonnegative,)
 
-    "[OPTION] Static stability upper threshold for stratocumulus (GSEN, called GSES1 in the paper) [J/kg]"
+    "[OPTION] Static stability upper threshold for stratocumulus, as dry static energy gradient Δs/ΔΦ [1]"
     @param stratocumulus_stability_max::NF = 0.4 (bounds = Nonnegative,)
 
     "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
     @param stratocumulus_cover_max::NF = 0.6 (bounds = 0 .. 1,)
 
+    "[OPTION] Minimum stratocumulus cloud cover over land (for surface RH = 1) [1]"
+    @param stratocumulus_cover_min_land::NF = 0.15 (bounds = 0 .. 1,)
+
+    "[OPTION] Clouds only form in layers below the tropopause (σ ≥ σ_tropopause) [1]"
+    σ_tropopause::NF = 0.14
+
+    "[OPTION] Top of the boundary layer: clouds form in layers above (σ ≤ σ_boundary_layer), stratocumulus at its top [1]"
+    σ_boundary_layer::NF = 0.9
+
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
 
-    "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
+    "[OPTION] Stratocumulus cloud factor [1]"
     @param stratocumulus_cloud_factor::NF = 1.2 (bounds = Nonnegative,)
+
+    "[DERIVED] Highest layer in which clouds can form, first layer below the tropopause, set in `initialize!`"
+    layer_top::RI = Ref(0)
+
+    "[DERIVED] Cloud base, lowest layer above the boundary layer, set in `initialize!`"
+    cloud_base::RI = Ref(0)
 end
 
 Adapt.@adapt_structure DiagnosticClouds
-DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF}(; kwargs...)
-initialize!(clouds::DiagnosticClouds, model::AbstractModel) = nothing
+DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF, Base.RefValue{Int}}(; kwargs...)
+
+# the free troposphere layers only depend on the vertical coordinates, precompute them
+function initialize!(clouds::DiagnosticClouds, model::AbstractModel)
+    clouds.layer_top[], clouds.cloud_base[] = free_troposphere_layers(clouds, model.geometry.vertical_coordinates)
+    return nothing
+end
 
 variables(::DiagnosticClouds) = (
     ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
@@ -81,12 +103,13 @@ variables(::DiagnosticClouds) = (
         model,
     )
     # Diagnose cloud cover and cloud top.
-    (; cloud_cover, cloud_top, stratocumulus_cover) = diagnose_cloud_properties(ij, vars, clouds, model)
+    (; cloud_cover, cloud_top, cloud_base, stratocumulus_cover) = diagnose_cloud_properties(ij, vars, clouds, model)
 
     return (    # NamedTuple
         cloud_cover = cloud_cover,
         cloud_albedo = clouds.cloud_albedo,
         cloud_top = cloud_top,
+        cloud_base = cloud_base,
         stratocumulus_cover = stratocumulus_cover,
         stratocumulus_albedo = clouds.stratocumulus_albedo,
     )
@@ -94,7 +117,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Core cloud diagnosis algorithm shared by DiagnosticClouds and SpectralDiagnosticClouds.
-Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
+Returns (cloud_cover, cloud_top, cloud_base, stratocumulus_cover) tuple."""
 @propagate_inbounds function diagnose_cloud_properties(ij, vars, clouds::DiagnosticClouds, model)
 
     temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, clouds)
@@ -118,37 +141,44 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     stab_max = clouds.stratocumulus_stability_max
     cover_max = clouds.stratocumulus_cover_max
     cloud_factor = clouds.stratocumulus_cloud_factor
+    cover_min_land = clouds.stratocumulus_cover_min_land
 
-    # Precipitation contribution (rain rate is in m/s)
-    rain_rate = vars.parameterizations.rain_rate[ij]
-    precip_term = min(precip_max, (1000 * 86400) * rain_rate)   # convert m/s to mm/day
+    # Precipitation contribution from rain and snow (both in m/s)
+    (; parameterizations) = vars
+    snow_rate = haskey(parameterizations, :snow_rate) ? parameterizations.snow_rate[ij] : zero(NF)
+    precip_rate = parameterizations.rain_rate[ij] + snow_rate
+    precip_term = min(precip_max, max(0, precip_rate) * 86400 * 1000)   # convert m/s to mm/day
     P = precip_weight * sqrt(precip_term)
 
     # from convection or large-scale condensation
     cloud_top_precipitation = vars.parameterizations.cloud_top[ij]
-    Δrh_max::NF = 0                     # maximum relative humidity excess over rh_min
-    cloud_top_humidity = nlayers + 1    # level of maximum relative humidity, nlayers + 1 = no cloud
 
-    # Find cloud top as the level of maximum relative humidity (SPEEDY), not the highest level
-    # exceeding rh_min, in tropospheric layers excluding the top (stratosphere) and the
-    # surface (boundary) layer, loop upwards so that ties are resolved to the lower level
-    for k in (nlayers - 1):-1:2
+    # clouds form in the free troposphere, layers between the tropopause and the boundary layer
+    layer_top, cloud_base = clouds.layer_top[], clouds.cloud_base[]
+
+    # Find the layer of maximum relative humidity in the free troposphere (with q > q_min,
+    # except for the cloud base layer directly above the boundary layer as in SPEEDY, so that
+    # clouds can also form in cold and dry polar air), cloud cover is a quadratic function of
+    # that maximum, the cloud top is its layer
+    rh_excess_max::NF = 0
+    cloud_top_humidity = nlayers + 1
+    for k in layer_top:cloud_base
         humidity_k = humid[ij, k]
         pₖ = pressure(k, pₛ, vertical_coordinates)
         qsat = saturation_humidity(temp[ij, k], pₖ, model.atmosphere)
-        if humidity_k > q_min && qsat > 0
-            Δrh = humidity_k / qsat - rh_min
-            if Δrh > Δrh_max
-                Δrh_max = Δrh
-                cloud_top_humidity = k
-            end
-        end
+        valid = ((humidity_k > q_min) | (k == cloud_base)) & (qsat > 0)
+        rh_excess = humidity_k / ifelse(qsat > 0, qsat, one(NF)) - rh_min  # avoid division by zero
+        new_max = valid & (rh_excess > rh_excess_max)
+        rh_excess_max = ifelse(new_max, rh_excess, rh_excess_max)
+        cloud_top_humidity = ifelse(new_max, k, cloud_top_humidity)
     end
+    humidity_term = min(1, rh_excess_max / (rh_max - rh_min))^2
 
-    # Combined cloud cover, quadratic in the maximum relative humidity
-    humidity_term = min(1, Δrh_max / (rh_max - rh_min))^2
+    # Combined cloud cover
     cloud_cover = min(1, P + humidity_term)
+    # highest of humidity and precipitation cloud top, but kept within the free troposphere
     cloud_top = min(cloud_top_humidity, cloud_top_precipitation)
+    cloud_top = ifelse(cloud_top <= nlayers, clamp(cloud_top, layer_top, cloud_base), cloud_top)
     vars.parameterizations.cloud_top[ij] = cloud_top
 
     # store cloud cover and cloud top height [m] (0 for no cloud) for output
@@ -158,28 +188,56 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     Φ_top = geopotential[ij, k_top]
     vars.parameterizations.cloud_top_height[ij] = ifelse(cloud_top <= nlayers, Φ_top / model.planet.gravity, zero(NF))
 
-    # Stratocumulus parameterization
-    stratocumulus_cover::NF = 0         # fallback for no stratocumulus
-    if clouds.use_stratocumulus
-        # Vertical difference of dry static energy near surface
-        surface = nlayers               # surface index
-        above = max(1, nlayers - 1)     # layer above surface, max for 1 layer case, yields GSEN=0
-        G = (cₚ * temp[ij, surface] + geopotential[ij, surface]) -
-            (cₚ * temp[ij, above] + geopotential[ij, above])
+    # Stratocumulus parameterization, computed always and switched off with ifelse (branch-free)
+    # Static stability as vertical gradient of dry static energy s = cₚT + Φ between the
+    # surface layer and the cloud base layer above the boundary layer, normalized by the
+    # geopotential difference, i.e. GSE = Δs/ΔΦ = 1 + cₚΔT/ΔΦ, 0 for dry adiabatic,
+    # 1 for isothermal. With 8 layers (as in SPEEDY) these are the lowest two layers
+    surface = nlayers
+    above = cloud_base
+    ΔΦ = geopotential[ij, above] - geopotential[ij, surface]
+    Δs = cₚ * (temp[ij, above] - temp[ij, surface]) + ΔΦ
+    # Guard against division by zero (ΔΦ = 0 for a single layer, as above == surface) by
+    # always dividing with guarded numerator and denominator. Do not write this as
+    # ifelse(c, Δs / ifelse(c, ΔΦ, 1), 0): LLVM removes the inner ifelse as c is known to be true
+    # in the taken branch, so 0/0 = NaN is computed and propagates into the reverse-mode gradients
+    stable_layers = ΔΦ > 0
+    GSE = ifelse(stable_layers, Δs, zero(NF)) / ifelse(stable_layers, ΔΦ, one(NF))
 
-        # normalized static stability factor
-        static_stability = clamp((G - stab_min) / (stab_max - stab_min), 0, 1)
+    # normalized static stability factor
+    static_stability = clamp((GSE - stab_min) / (stab_max - stab_min), 0, 1)
 
-        stratocumulus_cover_ocean = static_stability * max(cover_max - cloud_factor * cloud_cover, 0)
-        pN = pressure(surface, pₛ, vertical_coordinates)
-        qsat_surface = saturation_humidity(temp[ij, surface], pN, model.atmosphere)
-        rh_surface = humid[ij, surface] / qsat_surface      # relative humidity at surface
-        stratocumulus_cover_land = stratocumulus_cover_ocean * rh_surface
+    stratocumulus_cover_ocean = static_stability * max(cover_max - cloud_factor * cloud_cover, 0)
+    pN = pressure(surface, pₛ, vertical_coordinates)
+    qsat_surface = saturation_humidity(temp[ij, surface], pN, model.atmosphere)
+    rh_surface = humid[ij, surface] / ifelse(qsat_surface > 0, qsat_surface, one(NF))  # relative humidity at surface
+    stratocumulus_cover_land = max(stratocumulus_cover_ocean, cover_min_land) * rh_surface
 
-        stratocumulus_cover =
-            (1 - land_fraction) * stratocumulus_cover_ocean +
-            land_fraction * stratocumulus_cover_land
-    end
+    stratocumulus_cover_land_sea =
+        (1 - land_fraction) * stratocumulus_cover_ocean +
+        land_fraction * stratocumulus_cover_land
+    stratocumulus_cover = ifelse(clouds.use_stratocumulus & (cloud_base < nlayers), stratocumulus_cover_land_sea, zero(NF))
 
-    return (; cloud_cover, cloud_top, stratocumulus_cover)
+    return (; cloud_cover, cloud_top, cloud_base, stratocumulus_cover)
+end
+
+"""$(TYPEDSIGNATURES)
+Range of layers `layer_top:cloud_base` of the free troposphere in which clouds can form:
+from the first layer below the tropopause (σ ≥ `σ_tropopause`) to the cloud base, the lowest
+layer above the boundary layer (σ ≤ `σ_boundary_layer`). Clouds never include the surface layer
+(unless there is only one layer), the cloud base is at least the first layer below the tropopause
+and at most the layer above the surface layer. For 8 equally spaced layers these are layers 2 to 7.
+Uses the surface pressure-independent `sigma(k, vertical_coordinates)`, so this is computed once
+in `initialize!` for any vertical coordinates."""
+function free_troposphere_layers(clouds::DiagnosticClouds, vertical_coordinates::AbstractVerticalCoordinates)
+    nlayers = get_nlayers(vertical_coordinates)
+    # σ increases monotonically downwards, so layer indices are counts of layers above
+    # a threshold, vectorized on the architecture of the vertical coordinates (no scalar indexing)
+    σ = sigma_full(vertical_coordinates)
+    σ_above_surface = view(σ, 1:(nlayers - 1))                  # exclude the surface layer
+    layer_top = count(<(clouds.σ_tropopause), σ_above_surface) + 1
+    cloud_base = count(<=(clouds.σ_boundary_layer), σ_above_surface)
+    cloud_base = max(cloud_base, min(layer_top, nlayers - 1), 1)
+    layer_top = min(layer_top, cloud_base)
+    return layer_top, cloud_base
 end

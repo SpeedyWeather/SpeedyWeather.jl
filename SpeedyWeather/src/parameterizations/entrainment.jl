@@ -12,6 +12,18 @@ Adapt.@adapt_structure NoEntrainment
 
 """$(TYPEDSIGNATURES) No entrainment at any σ level."""
 @inline (::NoEntrainment)(σ) = zero(σ)
+@inline (::NoEntrainment)(σ, Δσ) = zero(σ)
+
+"""$(TYPEDSIGNATURES)
+Fraction of environmental air mixed into the rising parcel over a σ distance `Δσ` at
+level `σ`. The entrainment profile `E(σ)` is the fraction mixed over the reference distance
+`E.reference_layer_thickness` (Δσ_ref), applied as a rate per unit σ so that the dilution through a
+column is independent of the number of layers: the fraction of the parcel that remains is
+`(1 - E(σ))^(Δσ/Δσ_ref)` which multiplies to the same over many thin or few thick layers, see #1426."""
+@inline function (E::AbstractEntrainment)(σ, Δσ)
+    remaining = (1 - min(E(σ), one(σ)))^(Δσ / E.reference_layer_thickness)
+    return 1 - remaining
+end
 
 """Whether an entrainment profile actually mixes environmental air into the rising parcel.
 `false` for [`NoEntrainment`](@ref) so that the mixing step in the ascent can be skipped
@@ -26,8 +38,11 @@ zero. Fields are $(TYPEDFIELDS)"""
     "[OPTION] Sigma level at which entrainment becomes zero [1]"
     @param σ_entrainment::NF = 0.5 (bounds = 0 .. 0.99,)
 
-    "[OPTION] Entrainment rate at the surface [1]"
+    "[OPTION] Entrainment rate at the surface [1] per reference_layer_thickness"
     @param surface_entrainment::NF = 0.5 (bounds = 0 .. 1,)
+
+    "[OPTION] Reference σ distance [1] over which the entrainment rate is the mixed fraction"
+    @param reference_layer_thickness::NF = 1 / 8 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure LinearEntrainment
@@ -40,8 +55,11 @@ LinearEntrainment(::Type{NF}; kwargs...) where {NF} = LinearEntrainment{NF}(; kw
 """Constant entrainment profile: entrainment rate is the same at every model level.
 Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct ConstantEntrainment{NF} <: AbstractEntrainment
-    "[OPTION] Constant entrainment rate [1]"
+    "[OPTION] Constant entrainment rate [1] per reference_layer_thickness"
     @param entrainment_rate::NF = 0.2 (bounds = 0 .. 1,)
+
+    "[OPTION] Reference σ distance [1] over which the entrainment rate is the mixed fraction"
+    @param reference_layer_thickness::NF = 1 / 8 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure ConstantEntrainment

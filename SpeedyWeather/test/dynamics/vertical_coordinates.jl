@@ -433,3 +433,10 @@ end
     # SigmaCoordinates so this is trivially true there too)
     @test sum(Array(H.A_thickness)) ≈ 0 atol = 1.0e-5
 end
+
+@testset "sigma_full" begin
+    spectral_grid = SpectralGrid(truncation = 21, nlayers = 8)
+    for coordinates in (SigmaCoordinates(spectral_grid), SigmaPressureCoordinates(spectral_grid))
+        @test SpeedyWeather.sigma_full(coordinates) == [SpeedyWeather.sigma(k, coordinates) for k in 1:8]
+    end
+end

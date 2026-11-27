@@ -11,7 +11,7 @@ CO₂ follows the model's `greenhouse_gases.co2` when present, else the scheme's
 ClearSkyEcCKDRadiation(SG::SpeedyWeather.SpectralGrid, gas_optics::EcCKDTabulatedGasOpticsModel; kwargs...) =
     ClearSkyEcCKDRadiation{SG.NF}(gas_optics; kwargs...)
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Load the reference ecCKD `model_pair` (`"32x32"` by default, or e.g. `"64x96"`) with the gases
 `names` (by chemical formula, `:dry_air` for the ecCKD files' `composite`); the tables are
 read with NCDatasets, a dependency of SpeedyWeather."""
@@ -322,7 +322,7 @@ Base.@propagate_inbounds function ecckd_shortwave!(ij, vars, fluxes, shortwave, 
                                          view(W.sw_stack_albedo, ij, 1:(nlayers + 1)),
                                          view(W.sw_source, ij, 1:(nlayers + 1)))
         boundary = ShortwaveBoundaryConditions(
-            toa_shortwave_down = model.planet.solar_constant * cos_zenith,
+            toa_shortwave_down = model.planet.solar_constant * SpeedyWeather.solar_distance_factor(vars) * cos_zenith,
             surface_albedo = albedo)
         radiative_fluxes!(fluxes, CloudlessShortwave(), shortwave, atmosphere, boundary, scratch)
     else
@@ -335,8 +335,6 @@ Base.@propagate_inbounds function ecckd_shortwave!(ij, vars, fluxes, shortwave, 
     surface_down = fluxes.shortwave_down[nlayers + 1]
     vars.parameterizations.outgoing_shortwave[ij] = fluxes.shortwave_up[1]
     vars.parameterizations.surface_shortwave_down[ij] = surface_down
-    vars.parameterizations.ocean.surface_shortwave_down[ij] = surface_down
-    vars.parameterizations.land.surface_shortwave_down[ij] = surface_down
     vars.parameterizations.surface_shortwave_up[ij] = fluxes.shortwave_up[nlayers + 1]
     vars.parameterizations.ocean.surface_shortwave_up[ij] = albedo_ocean * surface_down
     vars.parameterizations.land.surface_shortwave_up[ij] = albedo_land * surface_down

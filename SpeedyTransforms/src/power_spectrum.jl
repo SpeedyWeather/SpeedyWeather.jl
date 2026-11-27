@@ -1,4 +1,4 @@
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Compute the power spectrum of the spherical harmonic coefficients
 `spec` (lower triangular matrix/array) of type `Complex{NF}`.
 For any additional dimensions in `spec`, the power spectrum is

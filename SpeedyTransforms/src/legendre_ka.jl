@@ -67,7 +67,7 @@ multiply and add where it does not, whereas `fma` would force a slow software em
 end
 
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Inverse Legendre transform, adapted for KernelAbstractions (GPU usage) and batched across j (lattitude),
 k (vertical layers) and m (spherical harmonic order). Not to be used directly,
 but called from transform! with CuArrays."""

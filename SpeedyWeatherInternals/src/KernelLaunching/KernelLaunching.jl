@@ -1,6 +1,6 @@
 module KernelLaunching
 
-using DocStringExtensions
+using ..Utils: TYPEDSIGNATURES
 
 # kernel
 export configure_kernel, launch!

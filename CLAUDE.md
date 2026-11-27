@@ -40,7 +40,7 @@ SpeedyWeather/src/
 | Type | Purpose |
 |------|---------|
 | `SpectralGrid` | Central config: resolution (`truncation`), grid type, `nlayers`, `NF`, architecture |
-| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch) |
+| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, output, scratch) |
 | `Simulation{V,M}` | Top-level container holding model + variables |
 | `Leapfrog` | Time stepper with Robert/Williams filters |
 | `SpectralTransform` | FFT/Legendre transform machinery |
@@ -62,7 +62,7 @@ and `finalize!`.
 
 ### Variables Structure
 
-`Variables` is a unified container with 7 groups, each a NamedTuple:
+`Variables` is a unified container with 8 groups, each a NamedTuple:
 
 | Group | Purpose |
 |-------|---------|
@@ -72,6 +72,7 @@ and `finalize!`.
 | `dynamics` | Working arrays for the dynamical core (pressure gradients, vertical velocity, etc.) |
 | `parameterizations` | Working arrays for parameterizations (fluxes, radiation, cloud properties, etc.) |
 | `particles` | Particle advection variables |
+| `output` | Output-only variables, e.g. accumulated precipitation (write-only for dynamics/parameterizations) |
 | `scratch` | Temporary storage (write-before-read) |
 
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
@@ -86,7 +87,7 @@ vars.dynamics.w                                 # Vertical velocity
 
 Model components define their variables via variable type categories:
 `PrognosticVariable`, `GridVariable`, `TendencyVariable`, `DynamicsVariable`,
-`ParameterizationVariable`, `ParticleVariable`, `ScratchVariable`.
+`ParameterizationVariable`, `ParticleVariable`, `OutputVariable`, `ScratchVariable`.
 These are collected and allocated automatically by the `Variables(model)` constructor.
 
 ## Typical Usage
@@ -344,7 +345,18 @@ Write functions that are broadcast or passed to `set!` branch-free, so that Reac
 use `ifelse(cond, a, b)`, `min`, `max` or `clamp` instead of `if`, `? :`, `&&`, `||` or an early
 `return` on a value. Branches inside `@kernel`s are fine.
 
-To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. 
+To ensure differentiability avoid potential division by zero even within branches that aren't taken in an `ifelse`. These cases might cause `NaN`s in the gradients / differentiated models. Guard numerator and denominator separately, `ifelse(c, x, 0) / ifelse(c, y, 1)`, never with a nested `ifelse(c, x / ifelse(c, y, 1), 0)`: LLVM removes the inner `ifelse` because `c` is known to be true in the taken branch, leaving an unguarded `x / y`.
+
+### Number format conversions with Reactant
+
+Under Reactant, scalars can be traced (`TracedRNumber{Float32}`). `convert` to a *traced* type works
+(`convert(TracedRNumber{Float32}, 1.0f0)`), but `convert` (or `Float32(x)`, `oftype`) from a traced
+number to a *plain* number type has no method: `convert(Float32, x::TracedRNumber{Float32})` fails.
+Model parameters are usually plain numbers, so `convert(typeof(parameter), x)` breaks once `x` is traced.
+Promotion (`promote`, or plain arithmetic) always works but widens, so the input (e.g. a Float64)
+would decide the precision. To make the component's number format `NF` win, use
+`convert_number_format(NF, x)`: `convert` on CPU/GPU, only the element type for a traced `x`.
+Inside `@kernel`s values are plain numbers, so the issue arises in broadcasts and `set!` functions.
 
 ## Benchmarks
 
@@ -369,16 +381,13 @@ stored results with just these suites.
 The reverse-mode (AD) benchmarks with Reactant are opt-in,: add the flag
 `--reverse` (e.g. `manual_benchmarking.jl reactant-nvidia-gpu --reverse`). A run without it drops the
 stored reverse-mode results of that architecture. The flag `--hi-res` adds T342 and T512 to the
-PrimitiveWet resolution sweep, on GPU and TPU only. `--SPEEDY` adds a suite of the PrimitiveWet
-model over the same resolutions in a SPEEDY.f90-like configuration (prescribed seasonal climatologies,
-constant surface roughness, wind slowdown and gusts), on every architecture including Reactant. Truncations in the benchmarks are 1-based (T32, …, T256), as in
-the model code.
+PrimitiveWet resolution sweep, on GPU and TPU only. 
 
 For a quick check whether performance regressed, `manual_benchmarking.jl --debug` runs only a
 short PrimitiveWet resolution sweep with the default transform (T32–T128 with 8 layers, T32 and
 T128 with 16 layers) and does not touch the stored results.
-`julia SpeedyWeather/benchmark/regression/regression.jl check` runs it on main, the latest
-release and the latest benchmarked revision and compares them (also run weekly by
+`julia SpeedyWeather/benchmark/regression/regression.jl check` runs it (with `--length 2`, i.e. timed
+runs twice as long, to reduce noise) on main, the latest release and the latest benchmarked revision and compares them (also run weekly by
 `.github/workflows/benchmark_regression.yml`; the `benchmark-regression` skill builds on it).
 Labelling a PR `benchmark-performance` runs it on the PR merged into main vs main on every push
 (`.github/workflows/benchmark_pr.yml`), and `benchmark_pr_comment.yml` posts the report on the PR.
@@ -423,7 +432,10 @@ that submodule must be bumped according to its size:
 
 Bump the version of every submodule whose source you actually touched in the PR.
 A change confined to `SpeedyWeather/` does not require bumping
-`LowerTriangularArrays`, etc.
+`LowerTriangularArrays`, etc. 
+
+When `SpeedyWeather` depends on a new functionality of one of its submodule, also
+bump the compatibility entry accordingly. 
 
 ## Implementation plans
 

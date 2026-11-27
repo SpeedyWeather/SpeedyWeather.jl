@@ -63,7 +63,7 @@ function matrix_size(data::AbstractArray, lmax::Integer, mmax::Integer, i::Integ
     return size(data, i - 1)  # -1 as lmax, mmax are collapsed into a vector in the data array
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`."""
 Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis} = OneBased; as = Vector) = size(L, base, as)
@@ -529,7 +529,7 @@ function eachorder(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     return eachorder(L1)
 end
 
-"""$(TypedMethodSignatures(defaults = true)) True if both `L1` and `L2` are of the same size (as matrix),
+"""$(TYPEDSIGNATURES) True if both `L1` and `L2` are of the same size (as matrix),
 but ignores singleton dimensions, e.g. 5x5 and 5x5x1 would match.
 With `horizontal_only=true` (default `false`) ignore the non-horizontal dimensions,
 e.g. 5x5, 5x5x1, 5x5x2 would all match."""
@@ -790,31 +790,6 @@ as only the non-zero elements in `L` are assigned with x."""
 function Base.fill!(L::LowerTriangularArray, x)
     fill!(L.data, x)
     return L
-end
-
-"""
-$(TYPEDSIGNATURES)
-Zeros the largest degree (last row, l = lmax) of a LowerTriangularArray `L`.
-This sets all elements where l = lmax to zero
-"""
-function zero_last_degree!(L::LowerTriangularArray)
-    (; lmax, l_indices) = L.spectrum
-    arch = architecture(L)
-
-    launch!(
-        arch, SpectralWorkOrder, size(L),
-        zero_last_degree_kernel!,
-        L, l_indices, lmax
-    )
-
-    return nothing
-end
-
-@kernel inbounds = true function zero_last_degree_kernel!(data, l_indices, lmax)
-    I = @index(Global, Cartesian)
-    l = l_indices[I[1]]
-
-    data[I] = ifelse(l == lmax, zero(eltype(data)), data[I])
 end
 
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) =

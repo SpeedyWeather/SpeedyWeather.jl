@@ -1,7 +1,15 @@
 module Utils
 
-using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+using DocStringExtensions: DocStringExtensions
+
+# DocStringExtensions v0.10 can show default values of (keyword) arguments in signatures,
+# v0.9 can't (its `TypedMethodSignatures` has no `defaults` keyword) so fall back to the plain one
+const TYPEDSIGNATURES = if hasmethod(DocStringExtensions.TypedMethodSignatures, Tuple{}, (:defaults,))
+    DocStringExtensions.TypedMethodSignatures(defaults = true)
+else
+    DocStringExtensions.TYPEDSIGNATURES
+end
+
 using StyledStrings
 using ..Architectures
 
@@ -11,7 +19,7 @@ import Dates        # Dates for readable_secs
 export isincreasing, isdecreasing
 export print_fields, readable_secs
 export _jit, @maybe_jit
-export set_scalar!
+export set_scalar!, scalar_ref
 include("utility_functions.jl")
 
 end

@@ -4,6 +4,7 @@ export PrognosticVariable,
     DynamicsVariable,
     ParameterizationVariable,
     ParticleVariable,
+    OutputVariable,
     ScratchVariable
 
 for Var in (
@@ -13,6 +14,7 @@ for Var in (
         :DynamicsVariable,
         :ParameterizationVariable,
         :ParticleVariable,
+        :OutputVariable,
         :ScratchVariable,
     )
 
@@ -65,7 +67,7 @@ export Variables
 groups corresponding to the fields here $(TYPEDFIELDS) Each group can have
 their own namespaces to distinguish between e.g. ocean, land, or tracer variables.
 All non-prognostic groups are considered to be diagnostic with no memory between time steps."""
-@kwdef struct Variables{Po, G, T, D, Pm, Pt, S, F} <: AbstractVariables
+@kwdef struct Variables{Po, G, T, D, Pm, Pt, O, S, F} <: AbstractVariables
     "Prognostic variables subject to time stepping."
     prognostic::Po = NamedTuple()
 
@@ -84,6 +86,9 @@ All non-prognostic groups are considered to be diagnostic with no memory between
     "Variables used for particle advection"
     particles::Pt = NamedTuple()
 
+    "Variables for output only, e.g. accumulated precipitation. Write-only for dynamics and parameterizations."
+    output::O = NamedTuple()
+
     "Scratch variables for temporary storage during calculations with undetermined state (write before read)."
     scratch::S = NamedTuple()
 
@@ -92,7 +97,7 @@ All non-prognostic groups are considered to be diagnostic with no memory between
 end
 
 # defined e.g. for output filters, as fieldnames(Variables) isn't fully type stable
-const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :scratch, :fused)
+const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :output, :scratch, :fused)
 
 Adapt.@adapt_structure Variables
 
@@ -350,6 +355,7 @@ function Variables(model::AbstractModel)
     dynamics          = allocate(filter_variables(all_vars,         DynamicsVariable), model, fuse_parents)
     parameterizations = allocate(filter_variables(all_vars, ParameterizationVariable), model, fuse_parents)
     particles         = allocate(filter_variables(all_vars,         ParticleVariable), model, fuse_parents)
+    output            = allocate(filter_variables(all_vars,           OutputVariable), model, fuse_parents)
     scratch           = allocate(filter_variables(all_vars,          ScratchVariable), model, fuse_parents)
 
     # Install fused parents at their canonical home: vars.fused.<fuse_symbol>.
@@ -372,7 +378,7 @@ function Variables(model::AbstractModel)
                                name_a = :spectral_tendencies, name_b = :grid_tendencies)
     end
 
-    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)
+    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, output, scratch, fused)
 end
 # runic: on
 
@@ -445,7 +451,7 @@ _copy_entry!(dest::FusedParent, src::FusedParent) = _copy_entry!(dest.parent, sr
 _canonical_fuse_member(name::Symbol) =
     name === :u_tendency ? :u : name === :v_tendency ? :v : name
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Assert that two fuse parents `a` and `b` declare members in matching order — i.e. they
 agree both on which member names exist and on each member's layer-axis slot range. This
 is what lets a mega-batched `transform!` map slot k of one parent to slot k of the other
@@ -625,7 +631,7 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
     return nothing
 end
 
-"""$(TypedMethodSignatures(defaults = true)) Allocates all variables within a group given a tuple of variables
+"""$(TYPEDSIGNATURES) Allocates all variables within a group given a tuple of variables
 expected to be `<: AbstractVariable` definitions. Determines the namespaces,
 allocates the arrays with zeros and collects them into NamedTuples. Members of a
 fuse group are returned as views of a shared parent (allocated via `build_fuse_parents`),
@@ -726,7 +732,7 @@ function filter_variables(vars, VariableType)
     return group
 end
 
-"""$(TypedMethodSignatures(defaults = true))
+"""$(TYPEDSIGNATURES)
 Helper function to warn when a variable is not defined in the Variables. Reports on
 group (prognostic etc.) and namespace therein (e.g. ocean, land, etc.) and lists the defined variables in that group and namespace.
 Returns true to allow for short-circuiting with `&& return nothing` to exit a function early."""

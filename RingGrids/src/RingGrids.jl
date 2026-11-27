@@ -2,8 +2,8 @@ module RingGrids
 
 # DOCUMENTATION
 using StyledStrings
-using DocStringExtensions
-using DocStringExtensions: TypedMethodSignatures
+using DocStringExtensions: TYPEDFIELDS
+using SpeedyWeatherInternals.Utils: TYPEDSIGNATURES
 import Printf
 
 # NUMERICS
