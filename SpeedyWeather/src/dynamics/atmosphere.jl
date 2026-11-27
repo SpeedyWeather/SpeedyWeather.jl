@@ -11,7 +11,7 @@ $(TYPEDSIGNATURES)
 Create a struct `EarthAtmosphere <: AbstractAtmosphere`, with the following physical/chemical
 characteristics. Keyword arguments are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct EarthAtmosphere{NF} <: AbstractWetAtmosphere
+@parameterized @kwdef struct EarthAtmosphere{NF, SVP} <: AbstractWetAtmosphere
     "[OPTION] Molar mass of dry air [g/mol]"
     @param mol_mass_dry_air::NF = 28.9649 (bounds = Positive,)
 
@@ -57,9 +57,6 @@ $(TYPEDFIELDS)"""
     "[OPTION] Surface reference pressure [Pa]"
     @param reference_pressure::NF = 1.0e5 (bounds = Positive,)
 
-    "[OPTION] Saturation vapor pressure at freezing point (0°C) [Pa]"
-    @param saturation_vapor_pressure::NF = 610.78 (bounds = Positive,)
-
     "[OPTION] Surface reference temperature [K]"
     @param reference_temperature::NF = 288.0 (bounds = Nonnegative,)
 
@@ -71,11 +68,16 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Reference dry-adiabatic temperature lapse rate [K/m]"
     @param dry_lapse_rate::NF = 9.8 / 1000
+
+    "[OPTION] Saturation vapor pressure formulation, see `subtypes(SpeedyWeather.AbstractSaturationVaporPressure)`"
+    saturation::SVP = IFSMixedPhase{NF}()
 end
 
 Adapt.@adapt_structure EarthAtmosphere
-EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere{SG.NF}(; kwargs...)
+EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere(SG.NF; kwargs...)
 EarthAtmosphere(::Type{NF}; kwargs...) where {NF} = EarthAtmosphere{NF}(; kwargs...)
+EarthAtmosphere{NF}(; saturation = IFSMixedPhase{NF}(), kwargs...) where {NF} =
+    EarthAtmosphere{NF, typeof(saturation)}(; saturation, kwargs...)
 Base.eltype(::EarthAtmosphere{NF}) where {NF} = NF
 
 export EarthDryAtmosphere
@@ -132,22 +134,18 @@ latent_heat_fusion(A::AbstractDryAtmosphere) = zero(eltype(A))
 saturation_vapor_pressure(T, A::AbstractDryAtmosphere) = zero(T)
 
 """$(TYPEDSIGNATURES)
-Saturation water vapor pressure as a function of temperature using the
-Clausius-Clapeyron equation,
+Saturation water vapor pressure [Pa] as a function of temperature `T` [K] using the
+formulation `A.saturation`, see `subtypes(SpeedyWeather.AbstractSaturationVaporPressure)`.
+Defaults to `IFSMixedPhase`, Tetens over liquid water and ice with a mixed phase in between."""
+@inline saturation_vapor_pressure(T, A::AbstractWetAtmosphere) = saturation_vapor_pressure(A.saturation, T, A)
 
-    e(T) = e₀ * exp( -Lᵥ/Rᵥ * (1/T - 1/T₀)),
+"""$(TYPEDSIGNATURES)
+Derivative of the saturation water vapor pressure with respect to temperature, deₛ/dT [Pa/K],
+of the formulation `A.saturation` evaluated at temperature `T` [K]."""
+@inline grad_saturation_vapor_pressure(T, A::AbstractWetAtmosphere) = grad(A.saturation, T, A)
+grad_saturation_vapor_pressure(T, A::AbstractDryAtmosphere) = zero(T)
 
-where T is in Kelvin, Lᵥ the the latent heat of condensation and Rᵥ the gas constant of water vapor"""
-@inline function saturation_vapor_pressure(T, A::AbstractWetAtmosphere)
-    e₀ = A.saturation_vapor_pressure
-    Lᵥ = A.latent_heat_condensation
-    (; R_vapor) = A
-    T₀ = A.temperature_freezing
-    # no `convert(eltype(T₀), T)` here as that is not traceable by Reactant if T is traced
-    return e₀ * exp(Lᵥ / R_vapor * (inv(T₀) - inv(T)))
-end
-
-@inline saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
+saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
 
 """$(TYPEDSIGNATURES)
 Saturation specific humidity as a function of temperature [K] and pressure [Pa], defined as
@@ -159,61 +157,14 @@ with saturation vapor pressure eₛ(T), pressure p [Pa] and ratio of gas constan
     return ϵ * eₛ / p
 end
 
-export TetensEquation
+grad_saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
 
-"""
-Parameters for computing saturation vapor pressure of water using the Tetens' equation,
-
-    eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T + Tᵢ)),
-
-where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
-respectively. From Tetens (1930), and Murray (1967) for below freezing.
-$(TYPEDFIELDS)"""
-@kwdef struct TetensEquation{NF <: AbstractFloat}
-    "Saturation water vapor pressure at 0°C [Pa]"
-    e₀::NF = 610.78
-
-    "0°C in Kelvin"
-    T₀::NF = 273.15
-
-    "Tetens denominator (water) [˚C]"
-    T₁::NF = 237.3
-
-    "Tetens denominator following Murray (1967, below freezing) [˚C]"
-    T₂::NF = 265.5
-
-    "Tetens numerator scaling [1], above freezing"
-    C₁::NF = 17.27
-
-    "Tetens numerator scaling [1], below freezing"
-    C₂::NF = 21.875
-end
-
-"""
-$(TYPEDSIGNATURES)
-Saturation water vapor pressure as a function of temperature using the
-Tetens equation,
-
-    eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
-
-where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
-respectively."""
-@inline function saturation_vapor_pressure(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
-    (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
-    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))      # change coefficients above/below freezing
-    temp_celsius = temp_kelvin - T₀
-    return e₀ * exp(C * temp_celsius / (temp_celsius + T))
-end
-
-# Keep functor for backwards compatibility
-@inline (TE::TetensEquation)(temp_kelvin) = saturation_vapor_pressure(TE, temp_kelvin)
-
-"""
-$(TYPEDSIGNATURES)
-Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."""
-@inline function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
-    (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
-    e = saturation_vapor_pressure(TetensCoefficients, temp_kelvin)  # saturation vapor pressure
-    C, T = ifelse(temp_kelvin > T₀, (C₁, T₁), (C₂, T₂))   # change coefficients above/below freezing
-    return e * C * T / (temp_kelvin - T₀ - T)^2           # chain rule: times derivative of inner function
+"""$(TYPEDSIGNATURES)
+Derivative of the saturation specific humidity with respect to temperature [1/K],
+    ∂qₛ/∂T = ε/p * deₛ/dT,
+using the derivative `grad` of the saturation vapor pressure formulation `A.saturation`."""
+@inline function grad_saturation_humidity(T, p, A::AbstractWetAtmosphere)
+    deₛ_dT = grad_saturation_vapor_pressure(T, A)
+    ϵ = A.mol_ratio
+    return ϵ * deₛ_dT / p
 end

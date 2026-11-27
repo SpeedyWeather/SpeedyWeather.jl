@@ -136,6 +136,7 @@ include("dynamics/vertical_coordinates.jl")
 include("dynamics/geometry.jl")
 include("dynamics/coriolis.jl")
 include("dynamics/planet.jl")
+include("parameterizations/thermodynamics.jl")   # before atmosphere: default saturation vapor pressure
 include("dynamics/atmosphere.jl")
 include("dynamics/adiabatic_conversion.jl")
 include("dynamics/orography.jl")

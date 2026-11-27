@@ -63,6 +63,7 @@ makedocs(
             "Barotropic model" => "barotropic.md",
             "Shallow water model" => "shallowwater.md",
             "Primitive equation model" => "primitiveequation.md",
+            "Saturation vapor pressure" => "saturation_vapor_pressure.md",
             "Large-scale condensation" => "large_scale_condensation.md",
             "Convection" => "convection.md",
             "Radiation" => "radiation.md",

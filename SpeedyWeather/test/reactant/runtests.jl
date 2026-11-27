@@ -77,6 +77,7 @@ if "unit" in GROUPS
     include("test_time_steps.jl")
     include("test_implicit.jl")
     include("test_drag.jl")
+    include("test_thermodynamics.jl")
     include("differentation.jl")
 end
 
