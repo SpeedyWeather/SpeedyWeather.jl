@@ -99,57 +99,6 @@ end
 path(::ConvectiveSnow, simulation) =
     simulation.variables.output.snow_convection
 
-
-# TODO: Im not sure what compression level, shuffle, or keepbits to use - currently set to default
-
-"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LevelZeroBuoyancy <: AbstractOutputVariable
-    name::String = "level_zero_buoyancy"
-    unit::String = "1"
-    long_name::String = "level of zero buoyancy"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 15
-end
-
-path(::LevelZeroBuoyancy, simulation) =
-    simulation.variables.parameterizations.level_zero_buoyancy
-
-"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LevelFreeConvection <: AbstractOutputVariable
-    name::String = "level_free_convection"
-    unit::String = "1"
-    long_name::String = "level of free convection"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 15
-end
-
-path(::LevelFreeConvection, simulation) =
-    simulation.variables.parameterizations.level_free_convection
-
-"""Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LiftingCondensationLevel <: AbstractOutputVariable
-    name::String = "lifting_condensation_level"
-    unit::String = "1"
-    long_name::String = "lifting condensation level"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 15
-end
-
-path(::LiftingCondensationLevel, simulation) =
-    simulation.variables.parameterizations.lifting_condensation_level
-
 """Defines netCDF output for a specific variables, see [`Vorticity`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct CAPE <: AbstractOutputVariable
@@ -187,7 +136,7 @@ Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct PT <: AbstractOutputVariable
     name::String = "PT"
     unit::String = "mm/s"
-    long_name::String = "precipitable water due to warming"
+    long_name::String = "precipitation rate due to warming"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -203,7 +152,7 @@ Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct Pq <: AbstractOutputVariable
     name::String = "Pq"
     unit::String = "mm/s"
-    long_name::String = "precipitable water due to drying"
+    long_name::String = "precipitation rate due to drying"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -219,7 +168,7 @@ Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct PTPerLayer <: AbstractOutputVariable
     name::String = "PT_per_layer"
     unit::String = "mm/s"
-    long_name::String = "precipitable water due to warming per vertical layer"
+    long_name::String = "precipitation rate due to warming per vertical layer"
     dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -235,7 +184,7 @@ Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct PqPerLayer <: AbstractOutputVariable
     name::String = "Pq_per_layer"
     unit::String = "mm/s"
-    long_name::String = "precipitable water due to drying per vertical layer"
+    long_name::String = "precipitation rate due to drying per vertical layer"
     dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -258,9 +207,6 @@ Precipitation() = (
     PTPerLayer(),
     Pq(),
     PqPerLayer(),
-    LevelFreeConvection(),
-    LevelZeroBuoyancy(),
-    LiftingCondensationLevel(),
     CAPE(),
     CAPEPerLayer()
 )
