@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `initialize!(simulation)` throws an error if the layers of hybrid sigma-pressure coordinates would cross at the lowest surface pressure (high orography), suggesting `pressure_only_above + ramp_width/2` for `RampSigmaPressureCoordinates` [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
 - Replace `CubicSigmaPressureCoordinates` (its steep transition makes layers cross over high orography) by `RampSigmaPressureCoordinates` [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
 - Generalise the dynamical core (mass-weighted vertical integrals, vertical velocity, vertical advection, and adiabatic conversion) to hybrid sigma-pressure coordinates, so `SigmaPressureCoordinates`/`CubicSigmaPressureCoordinates` are no longer restricted to the pure-sigma limit; `SigmaCoordinates` code paths are unchanged [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)
 - Pressure gradient force RTᵥ∇ln(pₖ) for hybrid coordinates, consistent with the grid geopotential, semi-implicit operators linearised at 0.8·exp(mean ln pₛ), default initial conditions at η = p/pₛ, `RampSigmaPressureCoordinates` that keep layers thick over orography [#1236](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236)

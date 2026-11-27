@@ -96,19 +96,17 @@ Base revision: 20467269399f40212fee413a545496226de999ca
   backward Euler (time step ×12/nlayers above 12 levels); with uniform spacing stable at 8, NaN at 16-48.
   At 24 levels and T31 the ramp needs Δt = 1200 s, sigma (Frierson) 1800 s, both NaN at 2400 s.
 
-  ![Level lines over a mountain](hybrid-sigma-pressure-levels.png)
+  Level lines over a mountain ([plot and script in the PR](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236#issuecomment-6582515442)):
   16 Frierson-spaced levels over a Gaussian mountain (surface pressure down to 500 hPa) for σ, the cubic
   0.2-0.8 and the ramp transition: the cubic levels converge and cross at the mountain top (thinnest layer
-  -0.02 of its σ thickness), the ramp keeps them apart (0.46). Created with `hybrid-sigma-pressure-levels.jl`
-  (`julia --project=SpeedyWeather/test`).
+  -0.02 of its σ thickness), the ramp keeps them apart (0.46).
 
-  ![Level lines over the Palmer Ridge](palmer-ridge-levels.png)
-  The same for the 10 km "Palmer Ridge" stress test (9.7 km crest, ≈ 277 hPa, full width at half
+  Level lines over the Palmer Ridge ([plot and script in the PR](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1236#issuecomment-7224393560)):
+  the same for the 10 km "Palmer Ridge" stress test (9.7 km crest, ≈ 277 hPa, full width at half
   maximum 2Δx ≈ 417 km at T64, L31, standard-atmosphere surface pressure): σ, the default ramp
   (`pressure_only_above = 0.2, ramp_width = 0.3`) and a higher-starting ramp (0.05, 0.2). With the
   default ramp the levels cross over the ridge (thinnest layer -0.41 of its σ thickness, crossing
-  interfaces in red), the higher-starting ramp keeps them apart (0.54). Created with
-  `palmer-ridge-levels.jl`.
+  interfaces in red), the higher-starting ramp keeps them apart (0.54).
 
 > Feel free to adjust this transition. This was originally implemented as a draft just to show how the
 > transition could be done. As long as the Frierson idea of having thinner layers towards the surface
@@ -133,7 +131,10 @@ Base revision: 20467269399f40212fee413a545496226de999ca
 > hopefully makes this PR simpler?
 - 2026-11-27: merged main (BulkRichardsonDiffusion rewrite taken from main, which is already
   pressure-based; entrainment over Δ(p/pₛ) via `pressure_ratio`; shortwave aerosol factor
-  (p/pₛ)² instead of nominal σ²); added the Palmer Ridge level-line figure.
+  (p/pₛ)² instead of nominal σ²); added the Palmer Ridge level-line figure; plots and plotting scripts moved to PR comments instead of the repo.
+- 2026-11-27: `check_layer_thickness` called in `initialize!(simulation)` after the first transform:
+  errors if any layer has Δp ≤ 0 at the minimum or maximum grid surface pressure; layers of the ramp
+  cross for `pressure_only_above + ramp_width/2 > pₛ_min/p_ref`.
 
 ## Problem description
 

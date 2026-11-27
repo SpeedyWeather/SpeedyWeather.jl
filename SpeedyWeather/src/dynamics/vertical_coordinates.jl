@@ -446,3 +446,40 @@ RampSigmaPressureCoordinates(SG::SpectralGrid; σ_half = sigma_half_spacing(SG.n
     RampSigmaPressureCoordinates(SG, σ_half; kwargs...)
 
 RampSigmaPressureCoordinates(args...; kwargs...) = RampSigmaPressureCoordinates(SpectralGrid(), args...; kwargs...)
+
+"""$(TYPEDSIGNATURES)
+Check that no layer of the vertical `coordinate` has a zero or negative pressure thickness for any
+surface pressure between `surface_pressure_min` and `surface_pressure_max` [Pa], i.e. that layers do not
+cross over high orography. Throws an `ArgumentError` otherwise, with a suggestion for the parameters of
+`RampSigmaPressureCoordinates`. Sigma coordinates can never cross, so this is a no-op for those."""
+check_layer_thickness(::AbstractVerticalCoordinates, surface_pressure_min, surface_pressure_max) = nothing
+
+function check_layer_thickness(coordinate::SigmaPressureCoordinates, surface_pressure_min, surface_pressure_max)
+    coordinate_cpu = adapt(Array, coordinate)     # host copy for the scalar loop below
+    nlayers = get_nlayers(coordinate_cpu)
+    σ_thickness = get_σ_thickness(coordinate_cpu)
+    # Δp = ΔA*p_ref + ΔB*pₛ is linear in pₛ, so its minimum over the pₛ range is at either end
+    for pₛ in (surface_pressure_min, surface_pressure_max), k in 1:nlayers
+        Δp = pressure_thickness(k, pₛ, coordinate_cpu)
+        if !(Δp > 0)
+            thinnest = minimum(pressure_thickness(j, pₛ, coordinate_cpu) / (pₛ * σ_thickness[j]) for j in 1:nlayers)
+            r = pₛ / coordinate_cpu.reference_pressure
+            # B slope g = 1/(1 - a - w/2) keeps the thinnest layer at a fraction t of its σ thickness
+            # for a + w/2 ≤ 1 - (1-r)/(1-t*r), suggest t = 1/2
+            suggestion = 1 - (1 - r) / (1 - r / 2)
+            throw(
+                ArgumentError(
+                    "Vertical layers cross: at a surface pressure of $(round(pₛ / 100, digits = 1)) hPa " *
+                        "layer $k has a pressure thickness of $(round(Δp / 100, digits = 2)) hPa " *
+                        "(thinnest layer $(round(thinnest, digits = 2)) × its sigma thickness). " *
+                        "The hybrid coordinates switch to pure pressure levels too low for this orography. " *
+                        "For RampSigmaPressureCoordinates layers cross for pressure_only_above + ramp_width/2 > " *
+                        "$(round(r, digits = 3)) (minimum surface pressure/reference pressure); " *
+                        "pressure_only_above + ramp_width/2 ≤ $(round(suggestion, digits = 3)) keeps the thinnest " *
+                        "layer at half its sigma thickness, or use SigmaCoordinates."
+                )
+            )
+        end
+    end
+    return nothing
+end

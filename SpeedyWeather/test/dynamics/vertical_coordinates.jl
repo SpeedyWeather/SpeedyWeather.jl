@@ -440,3 +440,27 @@ end
         @test SpeedyWeather.sigma_full(coordinates) == [SpeedyWeather.sigma(k, coordinates) for k in 1:8]
     end
 end
+
+@testset "Crossing layers over high orography" begin
+    spectral_grid = SpectralGrid(truncation = 32, nlayers = 8)
+    σ_half = SpeedyWeather.sigma_half_spacing(8, SpeedyWeather.frierson_profile)
+    default_ramp = RampSigmaPressureCoordinates(spectral_grid, σ_half)
+    higher_ramp = RampSigmaPressureCoordinates(spectral_grid, σ_half; pressure_only_above = 0.05, ramp_width = 0.2)
+    sigma = SigmaCoordinates(spectral_grid, σ_half)
+
+    # Earth-like range of surface pressure: no crossing
+    for coordinate in (sigma, default_ramp, higher_ramp)
+        @test isnothing(SpeedyWeather.check_layer_thickness(coordinate, 5.5e4, 1.05e5))
+    end
+
+    # 10 km "Palmer Ridge", pₛ ≈ 277 hPa: the default ramp crosses (a + w/2 = 0.35 > 0.277)
+    @test_throws ArgumentError SpeedyWeather.check_layer_thickness(default_ramp, 2.77e4, 1.05e5)
+    @test isnothing(SpeedyWeather.check_layer_thickness(higher_ramp, 2.77e4, 1.05e5))
+    @test isnothing(SpeedyWeather.check_layer_thickness(sigma, 2.77e4, 1.05e5))
+
+    # called by initialize!(simulation) with the actual surface pressure
+    model = PrimitiveDryModel(spectral_grid; geometry = Geometry(spectral_grid; vertical_coordinates = default_ramp))
+    simulation = initialize!(model)
+    set!(simulation, pressure = (λ, φ) -> log(2.77e4))
+    @test_throws ArgumentError run!(simulation, steps = 1)
+end
